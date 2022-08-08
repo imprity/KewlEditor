@@ -534,6 +534,16 @@ int utf_sv_find_right_from(UTFStringView str, UTFStringView to_find, size_t from
     return found_at + from;
 }
 
+bool utf_sv_starts_with(UTFStringView sv, UTFStringView with)
+{
+    return (utf_sv_find(sv, with) == 0);
+}
+
+bool utf_sv_ends_with(UTFStringView sv, UTFStringView with)
+{
+    return (utf_sv_find_last(sv, with) == (sv.count - with.count));
+}
+
 void utf_sv_fprint(UTFStringView sv, FILE* file)
 {
     for (int i = 0; i < sv.data_size; i++) {

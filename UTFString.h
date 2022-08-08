@@ -63,8 +63,11 @@ bool utf_sv_cmp(UTFStringView str1, UTFStringView str2);
 
 int utf_sv_find(UTFStringView str, UTFStringView to_find);
 int utf_sv_find_last(UTFStringView str, UTFStringView to_find);
-int utf_sv_find_left_from(UTFStringView str, UTFStringView to_find);
-int utf_sv_find_right_from(UTFStringView str, UTFStringView to_find);
+int utf_sv_find_left_from(UTFStringView str, UTFStringView to_find, size_t from);
+int utf_sv_find_right_from(UTFStringView str, UTFStringView to_find, size_t from);
+
+bool utf_sv_starts_with(UTFStringView sv, UTFStringView with);
+bool utf_sv_ends_with(UTFStringView sv, UTFStringView with);
 
 bool utf_test();
 

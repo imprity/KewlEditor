@@ -132,14 +132,14 @@ size_t text_box_calculate_str_start(TextBox* box) {
 
 		size_t cut_off = 0;
 		if (sv_fits(line, box->font, box->w, &cut_off, NULL)) {
-			str_start -= utf_sv_count(line);
-			sv = utf_sv_trim_left(sv, new_line_at);
+			str_start -= line.count;
+			sv = utf_sv_trim_right(sv, line.count);
 		}
 		else {
-			size_t line_cont = utf_sv_count(line);
+			size_t line_cont = line.count;
 			line_cont -= cut_off;
 			str_start -= line_cont;
-			sv = utf_sv_trim_left(sv, line_cont);
+			sv = utf_sv_trim_right(sv, line_cont);
 		}
 
 		height_remainder -= font_heigt;
@@ -148,6 +148,46 @@ size_t text_box_calculate_str_start(TextBox* box) {
 	if (str_start < 0) { str_start = 0; }
 
 	return str_start;
+}
+
+size_t text_box_caclualte_line_start(TextBox* box, size_t from) {
+	UTFStringView sv = utf_sv_sub_str(*(box->str), 0, from);
+
+	if (utf_sv_ends_with(sv, utf_sv_from_cstr("\n"))) {
+		from -= 1;
+		sv = utf_sv_trim_right(sv,1);
+	}
+
+	int new_line_index = utf_sv_find_last(sv, utf_sv_from_cstr("\n"));
+
+	if (new_line_index < 0) {
+		new_line_index = 0;
+	}
+
+	UTFStringView line = utf_sv_sub_sv(sv, new_line_index, sv.count);
+
+	size_t fit = 0;
+	while (!sv_fits(line, box->font, box->w, &fit, NULL)) {
+		line = utf_sv_trim_left(line, fit);
+	}
+
+	return from - line.count;
+}
+
+size_t text_box_caclualte_line_end(TextBox* box, size_t from) {
+	UTFStringView sv = utf_sv_sub_str(*(box->str), from, box->str->count);
+
+	int new_line_index = utf_sv_find(sv, utf_sv_from_cstr("\n"));
+
+	if (new_line_index < 0) {
+		new_line_index = sv.count;
+	}
+
+	UTFStringView line = utf_sv_sub_sv(sv, from, new_line_index);
+
+	size_t fit = 0;
+	sv_fits(line, box->font, box->w, &fit, NULL);
+	return from + fit;
 }
 
 void calculate_cursor_pos(TextBox* box, int* cursor_x, int* cursor_y) 
@@ -203,6 +243,8 @@ void calculate_cursor_pos(TextBox* box, int* cursor_x, int* cursor_y)
 
 	*cursor_y = y_offset;
 }
+
+
 
 void text_box_render(TextBox* box, SDL_Renderer* renderer) {
 	/////////////////////////////
@@ -316,21 +358,15 @@ void text_box_move_cursor_left(TextBox* box)
 	box->cursor_pos -= 1;
 	
 	if (box->cursor_pos < box->str_start) {
-		UTFStringView sv = utf_sv_sub_str(*(box->str), 0, box->str_start);
-		//TODO : account for windows new line \r\n
-		int new_line_at = utf_sv_find_last(sv, utf_sv_from_cstr("\n"));
-		if (new_line_at < 0) {
-			new_line_at = 0;
-		}
-		new_line_at += 1;
-		box->str_start = new_line_at;
+		UTFStringView sv = utf_sv_from_str(*(box->str));
+		box->str_start = text_box_caclualte_line_start(box, box->cursor_pos);
 		box->str_end = text_box_calculate_str_end(box);
 	}
 }
 
 void text_box_move_cursor_right(TextBox* box)
 {
-	size_t box_text_count = utf_count(*(box->str));
+	size_t box_text_count = box->str->count;
 
 	if (box->cursor_pos >= box_text_count) {
 		return;
@@ -339,14 +375,8 @@ void text_box_move_cursor_right(TextBox* box)
 	box->cursor_pos += 1;
 
 	if (box->cursor_pos > box->str_end) {
-		UTFStringView sv = utf_sv_sub_str(*(box->str), box->str_end, box_text_count);
-		//TODO : account for windows new line \r\n
-		int new_line_at = utf_sv_find(sv, utf_sv_from_cstr("\n"));
-		if (new_line_at < 0) {
-			new_line_at = box_text_count;
-		}
-		new_line_at += 1;
-		UTFStringView line = utf_sv_sub_str(*(box->str), box->str_end, new_line_at);
-
+		UTFStringView sv = utf_sv_from_str(*(box->str));
+		box->str_end = text_box_caclualte_line_end(box, box->cursor_pos);
+		box->str_start = text_box_calculate_str_start(box);
 	}
 }

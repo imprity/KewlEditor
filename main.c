@@ -84,7 +84,6 @@ int main(int argc, char* argv[])
         goto cleanup;
     }
 
-    box->str_end = text_box_calculate_str_end(box);
     text_box_render(box, renderer);
 
     while  (!quit) {
@@ -96,10 +95,9 @@ int main(int argc, char* argv[])
             }break;
             
             case SDL_TEXTINPUT: {
-                utf_append(box->str, event.text.text);
+                utf_insert(box->str, box->cursor_pos, event.text.text);
+                text_box_move_cursor_right(box);
                 text_changed = true;
-                printf("text edited!!\n");
-                box->str_end = text_box_calculate_str_end(box);
                 text_box_render(box, renderer);
             }
 
@@ -108,8 +106,16 @@ int main(int argc, char* argv[])
             case SDL_KEYDOWN: {
                 SDL_Keysym key = event.key.keysym;
                 if (key.scancode == SDL_SCANCODE_RETURN) {
-                    utf_append(box->str, "\n");
-                    box->str_end = text_box_calculate_str_end(box);
+                    utf_insert(box->str, box->cursor_pos, "\n");
+                    text_box_move_cursor_right(box);
+                    text_box_render(box, renderer);
+                }
+                if (key.scancode == SDL_SCANCODE_LEFT) {
+                    text_box_move_cursor_left(box);
+                    text_box_render(box, renderer);
+                }
+                if (key.scancode == SDL_SCANCODE_RIGHT) {
+                    text_box_move_cursor_right(box);
                     text_box_render(box, renderer);
                 }
             }break;
