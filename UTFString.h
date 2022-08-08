@@ -1,3 +1,6 @@
+//TODO : needs """VERY HEAVY""" heavy refactoring
+//TODO : maybe cache actual character count
+
 #ifndef UTFString_HEADER_GUARD
 #define UTFString_HEADER_GUARD
 
@@ -11,7 +14,8 @@ typedef struct UTFString {
 }UTFString;
 
 size_t utf8_get_length(const char* str);
-size_t utf_to_byte_index(const char* str, size_t index);
+size_t utf_count_to_byte(const char* str, size_t index);
+size_t utf_byte_to_count(const char* str, size_t index);
 
 UTFString* utf_create(const char* str);
 void utf_destroy(UTFString* str);
@@ -35,12 +39,14 @@ typedef struct UTFStringView {
     size_t data_size; //does not include null terminated character
 }UTFStringView;
 
-size_t utf_sv_to_byte_index(UTFStringView sv, size_t index);
+size_t utf_sv_count_to_byte(UTFStringView sv, size_t index);
+size_t utf_sv_byte_to_count(UTFStringView sv, size_t index);
 
 UTFStringView utf_sv_from_cstr(const char * str);
 UTFStringView utf_sv_from_str(UTFString str);
 UTFStringView utf_sv_sub_str(UTFString str, size_t from, size_t to);
 UTFStringView utf_sv_sub_sv(UTFStringView str, size_t from, size_t to);
+UTFStringView utf_sv_copy(UTFStringView str);
 
 size_t utf_sv_count(UTFStringView sv);
 size_t utf_sv_count_left_from(UTFStringView sv, size_t from);

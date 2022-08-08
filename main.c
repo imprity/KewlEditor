@@ -9,6 +9,7 @@
 #define TEST_FONT "NotoSansKR-Medium.otf"
 
 #include "UTFString.h"
+#include "TextBox.h"
 #include <Windows.h>
 
 
@@ -38,7 +39,8 @@ int main(int argc, char* argv[])
     SDL_Window* win = SDL_CreateWindow("GAME",
         SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED,
-        600, 600, SDL_WINDOW_RESIZABLE);
+        //600, 600, SDL_WINDOW_RESIZABLE);
+        600, 600, 0);
 
     SDL_Renderer* renderer = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED);
 
@@ -64,29 +66,28 @@ int main(int argc, char* argv[])
     // end of load font
     ////////////////////////////////
 
-    UTFString* edit_str = utf_create(u8"시작 : ");
+    TextBox* box = text_box_create(u8"hello\n world", 600, 600, font, renderer);
 
     ////////////////////////////////
     // event loop
     ////////////////////////////////
     
-    SDL_Rect rect = { .x = 0,.y = 0,.w = 300, .h = 300 };
+    SDL_Rect rect = { .x = 0,.y = 0,.w = 600, .h = 600 };
     SDL_SetTextInputRect(&rect);
     SDL_StartTextInput();
-    //assert(SDL_IsTextInputActive());
+    assert(SDL_IsTextInputActive());
     SDL_Event event;
-    bool quit = false;
     bool text_changed = true;
-    SDL_Texture* text_texture = NULL;
-    int texture_width = 0;
-    int texture_height = 0;
+    bool quit = false;
 
     if (!init_success) {
         goto cleanup;
     }
 
+    box->str_end = text_box_calculate_str_end(box);
+    text_box_render(box, renderer);
+
     while  (!quit) {
-        
         while (SDL_PollEvent(&event)) {
             switch (event.type) {
 
@@ -95,40 +96,33 @@ int main(int argc, char* argv[])
             }break;
             
             case SDL_TEXTINPUT: {
-                utf_append(edit_str, event.text.text);
+                utf_append(box->str, event.text.text);
                 text_changed = true;
                 printf("text edited!!\n");
+                box->str_end = text_box_calculate_str_end(box);
+                text_box_render(box, renderer);
             }
 
             case SDL_TEXTEDITING: {
+            }break;
+            case SDL_KEYDOWN: {
+                SDL_Keysym key = event.key.keysym;
+                if (key.scancode == SDL_SCANCODE_RETURN) {
+                    utf_append(box->str, "\n");
+                    box->str_end = text_box_calculate_str_end(box);
+                    text_box_render(box, renderer);
+                }
             }break;
             }
         }
         SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
         SDL_RenderClear(renderer);
 
-        if (text_changed) {
-            if (text_texture) {
-                SDL_DestroyTexture(text_texture);
-            }
-            SDL_Color color = { 0,0,0,255 };
-            SDL_Surface* surface = TTF_RenderUTF8_Blended_Wrapped(font, edit_str->data, color, 500);
+        SDL_Rect rect = { .x = 0, .y = 0, .w = 600, .h = 600 };
+        SDL_RenderFillRect(renderer, &rect);
 
-            texture_width = surface->w;
-            texture_height = surface->h;
-            text_texture = SDL_CreateTextureFromSurface(renderer, surface);
-            if (!text_texture) {
-                printf("ERROR: Failed to create texture form surface!!! : %s\n", SDL_GetError());
-                goto cleanup;
-            }
-            SDL_FreeSurface(surface);
-            text_changed = false;
-        }
-
-        if (text_texture) {
-            SDL_Rect rect = {.x = 10,.y = 10,.w = texture_width,.h = texture_height };
-            SDL_RenderCopy(renderer, text_texture, NULL, &rect);
-        }
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+        SDL_RenderCopy(renderer, box->texture, NULL, NULL);
         
         SDL_RenderPresent(renderer);
     }
@@ -137,8 +131,7 @@ cleanup :
     if (win) { SDL_DestroyWindow(win); }
     if (renderer) { SDL_DestroyRenderer(renderer); }
     if (font) { TTF_CloseFont(font); }
-    if (edit_str) { utf_destroy(edit_str); }
-    if (text_texture) { SDL_DestroyTexture(text_texture); }
+    if (box) { text_box_destroy(box); }
     SDL_Quit();
 
     return 0;

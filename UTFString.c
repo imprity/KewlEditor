@@ -15,7 +15,7 @@ size_t utf8_get_length(const char* str) {
     return count;
 }
 
-size_t utf_to_byte_index(const char* str, size_t index) {
+size_t utf_count_to_byte(const char* str, size_t index) {
     //TODO : there probably was a better way to calculate this
     //without using this many ifs...
     size_t byte_offset = 0;
@@ -31,18 +31,31 @@ size_t utf_to_byte_index(const char* str, size_t index) {
         else if ((byte & b4) == 0b11110000) { byte_offset += 4; }
         else if ((byte & b3) == 0b11100000) { byte_offset += 3; }
         else if ((byte & b2) == 0b11000000) { byte_offset += 2; }
-        else { assert(0); }
+        else { 
+            fprintf(stderr, "%s:%d:ERROR : unexpected byte %d\n", __FILE__, __LINE__, byte);
+            assert(0); 
+        }
     }
     return byte_offset;
 }
 
-size_t utf_sv_to_byte_index(UTFStringView sv, size_t index) {
+size_t utf_byte_to_count(const char* str, size_t index)
+{
+    utf_sv_count_left_from(utf_sv_from_cstr(str), index);
+}
+
+size_t utf_sv_count_to_byte(UTFStringView sv, size_t index) {
     //TODO : this is fucking terrible
     char tmp = sv.data[sv.data_size];
     sv.data[sv.data_size] = 0;
-    size_t byte_offset = utf_to_byte_index(sv.data, index);
+    size_t byte_offset = utf_count_to_byte(sv.data, index);
     sv.data[sv.data_size] = tmp;
     return byte_offset;
+}
+
+size_t utf_sv_byte_to_count(UTFStringView sv, size_t index)
+{
+    return utf_sv_count_left_from(sv, index);
 }
 
 ////////////////////////////
@@ -142,19 +155,26 @@ void utf_append(UTFString* str, const char* to_append) {
     str->data_size += str_len;
 }
 
-void utf_erase_right(UTFString* str, size_t how_many) {
-    if (how_many >= utf8_get_length(str->data)) {
+void utf_erase_right(UTFString* str, size_t how_many) 
+{
+    size_t str_count = utf_count(*str);
+    if (how_many >= str_count) {
         str->data_size = 0;
         str->data[str->data_size] = 0;
         return;
     }
 
-    str->data_size -= how_many;
+    how_many = str_count - how_many;
+    how_many = utf_count_to_byte(str->data, how_many);
+
+    str->data_size = how_many;
     str->data[str->data_size] = 0;
 }
 
-void utf_erase_left(UTFString* str, size_t how_many) {
-    if (how_many >= utf8_get_length(str->data)) {
+void utf_erase_left(UTFString* str, size_t how_many) 
+{
+    how_many = utf_count_to_byte(str->data, how_many);
+    if (how_many >= str->data_size) {
         str->data_size = 0;
         str->data[str->data_size] = 0;
         return;
@@ -168,10 +188,13 @@ void utf_erase_left(UTFString* str, size_t how_many) {
 }
 
 void utf_insert(UTFString* str, size_t at, const char* to_insert) {
-    if (at > str->data_size) {
-        fprintf(stderr, "%s:%d:ERROR : at(%zu) is bigger than string size(%zu)\n", __FILE__, __LINE__, at, str->data_size);
+    size_t char_count = utf_count(*str);
+    if (at > char_count) {
+        fprintf(stderr, "%s:%d:ERROR : at(%zu) is bigger than string size(%zu)\n", __FILE__, __LINE__, at, char_count);
         return;
     }
+
+    at = utf_count_to_byte(str->data, at);
 
     size_t str_len = strlen(to_insert);
     size_t null_included = str_len + 1;
@@ -194,10 +217,15 @@ void utf_erase_range(UTFString* str, size_t from, size_t to){
         return;
     }
 
-    if (!(str->data_size >= to && str->data_size >= from)) {
-        fprintf(stderr, "%s:%d:ERROR : from(%zu) or to(%zu) is bigger than char length(%zu)\n", __FILE__, __LINE__, from, to, str->data_size);
+    size_t char_count = utf_count(*str);
+
+    if (!(char_count >= to && char_count >= from)) {
+        fprintf(stderr, "%s:%d:ERROR : from(%zu) or to(%zu) is bigger than char length(%zu)\n", __FILE__, __LINE__, from, to, char_count);
         return;
     }
+
+    from = utf_count_to_byte(str->data, from);
+    to = utf_count_to_byte(str->data, to);
 
     size_t delete_length = to - from;
     size_t distance = to - from;
@@ -226,6 +254,7 @@ UTFStringView utf_sv_from_str(UTFString str) {
 }
 
 UTFStringView utf_sv_sub_str(UTFString str, size_t from, size_t to) {
+    size_t sv_count = utf_count(str);
     if (to <= from) {
         fprintf(stderr, "%s:%d:WARN : from(%zu) is bigger than to(%zu)\n", __FILE__, __LINE__, from, to);
         size_t tmp = to;
@@ -233,15 +262,18 @@ UTFStringView utf_sv_sub_str(UTFString str, size_t from, size_t to) {
         from = to;
     }
 
-    if (str.data_size < to) {
-        fprintf(stderr, "%s:%d:WARN : to(%zu) is bigger than char length(%zu)\n", __FILE__, __LINE__, to, str.data_size);
+    if (sv_count < to) {
+        fprintf(stderr, "%s:%d:WARN : to(%zu) is bigger than char length(%zu)\n", __FILE__, __LINE__, to, sv_count);
         to = str.data_size;
     }
 
-    if (str.data_size < from) {
-        fprintf(stderr, "%s:%d:WARN : from(%zu) is bigger than char length(%zu)\n", __FILE__, __LINE__, from, str.data_size);
+    if (sv_count < from) {
+        fprintf(stderr, "%s:%d:WARN : from(%zu) is bigger than char length(%zu)\n", __FILE__, __LINE__, from, sv_count);
         from = str.data_size;
     }
+
+    from = utf_count_to_byte(str.data, from);
+    to = utf_count_to_byte(str.data, to);
 
     UTFStringView sv;
     sv.data_size = to - from;
@@ -252,27 +284,34 @@ UTFStringView utf_sv_sub_str(UTFString str, size_t from, size_t to) {
 
 UTFStringView utf_sv_sub_sv(UTFStringView str, size_t from, size_t to) 
 {
+    size_t sv_count = utf_sv_count(str);
     if (to <= from) {
-        fprintf(stderr, "%s:%d:WARN : from(%zu) is bigger than to(%zu)\n", __FILE__, __LINE__, from, to);
         size_t tmp = to;
         to = from;
         from = to;
     }
 
-    if (str.data_size < to) {
-        fprintf(stderr, "%s:%d:WARN : to(%zu) is bigger than char length(%zu)\n", __FILE__, __LINE__, to, str.data_size);
-        to = str.data_size;
+    if (sv_count < to) {
+        to = sv_count;
     }
 
-    if (str.data_size < from) {
-        fprintf(stderr, "%s:%d:WARN : from(%zu) is bigger than char length(%zu)\n", __FILE__, __LINE__, from, str.data_size);
-        from = str.data_size;
+    if (sv_count < from) {
+        from = sv_count;
     }
+
+    from = utf_sv_count_to_byte(str,from);
+    to = utf_sv_count_to_byte(str, to);
 
     UTFStringView sv;
     sv.data_size = to - from;
     sv.data = str.data + from;
     return sv;
+}
+
+UTFStringView utf_sv_copy(UTFStringView sv)
+{
+    UTFStringView copy = { .data = sv.data, .data_size = sv.data_size };
+    return copy;
 }
 
 size_t utf_sv_count(UTFStringView sv)
@@ -339,9 +378,15 @@ size_t utf_sv_prev(UTFStringView sv, size_t pos)
 
 UTFStringView utf_sv_trim_left(UTFStringView sv, size_t how_many)
 {
-    if (how_many >= sv.data_size) {
-        how_many = sv.data_size;
+    size_t sv_count = utf_sv_count(sv);
+    if (how_many >= sv_count) {
+        sv.data += sv.data_size;
+        sv.data_size = 0;
+        return sv;
     }
+
+    how_many = utf_sv_count_to_byte(sv, how_many);
+
     sv.data += how_many;
     sv.data_size -= how_many;
     return sv;
@@ -349,9 +394,16 @@ UTFStringView utf_sv_trim_left(UTFStringView sv, size_t how_many)
 
 UTFStringView utf_sv_trim_right(UTFStringView sv, size_t how_many)
 {
-    if (how_many >= sv.data_size) {
-        how_many = sv.data_size;
+    size_t sv_count = utf_sv_count(sv);
+
+    if (how_many >= sv_count) {
+        sv.data_size = 0;
+        return sv;
     }
+
+    how_many = sv_count - how_many;
+    how_many = utf_sv_count_to_byte(sv, how_many);
+
     sv.data_size -= how_many;
     return sv;
 }
@@ -379,9 +431,9 @@ int utf_sv_find(UTFStringView str, UTFStringView to_find)
     size_t byte_offset = 0;
 
     while (byte_offset + to_find.data_size <= str.data_size) {
-        UTFStringView sub = utf_sv_sub_sv(str, byte_offset, byte_offset + to_find.data_size);
+        UTFStringView sub = {.data = str.data + byte_offset, .data_size = to_find.data_size};
         if (utf_sv_cmp(sub, to_find)) {
-            return byte_offset;
+            return utf_sv_byte_to_count(str, byte_offset);
         }
         byte_offset++;
     }
@@ -397,9 +449,9 @@ int utf_sv_find_last(UTFStringView str, UTFStringView to_find) {
     int byte_offset = str.data_size - to_find.data_size;
 
     while (byte_offset >= 0) {
-        UTFStringView sub = utf_sv_sub_sv(str, byte_offset, byte_offset + to_find.data_size);
+        UTFStringView sub = { .data = str.data + byte_offset, .data_size = to_find.data_size };
         if (utf_sv_cmp(sub, to_find)) {
-            return byte_offset;
+            return utf_sv_byte_to_count(str, byte_offset);
         }
         byte_offset--;
     }
@@ -427,22 +479,22 @@ bool utf_test()
 
     UTFString* str = utf_create(u8"안녕 세상아!! hello world!!");
     UTFStringView sv = utf_sv_from_str(*str);
+    size_t sv_length = utf_sv_count(sv);
 
     utf_sv_fprintln(sv, file);
 
     {
         size_t p = 0;
-        while (p != sv.data_size) {
-            size_t n = utf_sv_next(sv, p);
-            UTFStringView sub = utf_sv_sub_sv(sv, p, n);
+        while (p < sv_length) {
+            UTFStringView sub = utf_sv_sub_sv(sv, p, p+1);
             utf_sv_fprintln(sub, file);
-            p = n;
+            p++;
         }
     }
 
     {
         size_t loc = utf_sv_find(sv, utf_sv_from_cstr(u8"h"));
-        UTFStringView sub = utf_sv_sub_sv(sv, loc, sv.data_size);
+        UTFStringView sub = utf_sv_sub_sv(sv, loc, sv_length);
         utf_sv_fprintln(sub, file);
     }
 
@@ -459,11 +511,7 @@ bool utf_test()
         UTFStringView seven = utf_sv_from_cstr(u8"글씨 일곱개.");
         assert(utf_sv_count(seven) == 7);
         size_t middle = utf_sv_find(seven, utf_sv_from_cstr(u8"일"));
-        assert(utf_sv_count_left_from(seven, middle) == 3);
-        assert(utf_sv_count_right_from(seven, middle) == 4);
-        middle += 1;
-        assert(utf_sv_count_left_from(seven, middle) == 3);
-        assert(utf_sv_count_right_from(seven, middle) == 3);
+        assert(middle == 3);
     }
 
     {
@@ -484,8 +532,9 @@ bool utf_test()
         UTFStringView hello_sv = utf_sv_from_str(*hello);
 
         utf_insert(hello, 0, u8"Hello. ");
-        utf_insert(hello, hello->data_size, u8" 만나서 반갑습니다");
+        utf_insert(hello, utf_count(*hello), u8" 만나서 반갑습니다");
         utf_sv_fprintln(utf_sv_from_str(*hello), file);
+        utf_destroy(hello);
     }
 
     utf_destroy(str);
