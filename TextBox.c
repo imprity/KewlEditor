@@ -64,7 +64,7 @@ bool sv_fits(UTFStringView sv, TTF_Font* font, int w, size_t *text_count, int* t
 }
 
 size_t text_box_calculate_str_end(TextBox* box) {
-	size_t box_str_count = utf_count(*(box->str));
+	size_t box_str_count = box->str->count;
 	UTFStringView sv = utf_sv_sub_str(
 		*(box->str), 
 		box->str_start, 
@@ -91,7 +91,7 @@ size_t text_box_calculate_str_end(TextBox* box) {
 
 		size_t cut_off = 0;
 		if (sv_fits(line, box->font, box->w, &cut_off, NULL)) {
-			str_end += utf_sv_count(line);
+			str_end += line.count;
 			sv = utf_sv_trim_left(sv, new_line_at);
 		}
 		else {
@@ -162,7 +162,7 @@ void calculate_cursor_pos(TextBox* box, int* cursor_x, int* cursor_y)
 	/////////////////////////////
 	UTFStringView sv = utf_sv_sub_str(*(box->str), box->str_start, box->cursor_pos);
 
-	size_t sv_count = utf_sv_count(sv);
+	size_t sv_count = sv.count;
 
 	int font_height = TTF_FontHeight(box->font);
 	int y_offset = 0;
@@ -181,7 +181,7 @@ void calculate_cursor_pos(TextBox* box, int* cursor_x, int* cursor_y)
 		}
 
 		UTFStringView line = utf_sv_sub_sv(sv, 0, new_line_at);
-		size_t line_count = utf_sv_count(line);
+		size_t line_count = line.count;
 
 		size_t cut_off = 0;
 		SDL_Surface* surface = NULL;
@@ -223,7 +223,7 @@ void text_box_render(TextBox* box, SDL_Renderer* renderer) {
 
 	SDL_Color color = {.r = 255, .g = 255, .b = 255, .a = 255};
 
-	size_t sv_count = utf_sv_count(sv);
+	size_t sv_count = sv.count;
 
 	int font_height = TTF_FontHeight(box->font);
 	int y_offset = 0;
@@ -242,7 +242,7 @@ void text_box_render(TextBox* box, SDL_Renderer* renderer) {
 		}
 
 		UTFStringView line = utf_sv_sub_sv(sv, 0, new_line_at);
-		size_t line_count = utf_sv_count(line);
+		size_t line_count = line.count;
 
 		size_t cut_off = 0;
 		SDL_Surface* surface = NULL;

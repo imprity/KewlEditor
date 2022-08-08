@@ -11,11 +11,11 @@ typedef struct UTFString {
     char* data;
     size_t raw_size;
     size_t data_size; //does not include null terminated character
+    size_t count;
 }UTFString;
 
-size_t utf8_get_length(const char* str);
-size_t utf_count_to_byte(const char* str, size_t index);
-size_t utf_byte_to_count(const char* str, size_t index);
+size_t utf_count_to_byte(UTFString* str, size_t count);
+size_t utf_byte_to_count(UTFString* str, size_t byte);
 
 UTFString* utf_create(const char* str);
 void utf_destroy(UTFString* str);
@@ -37,6 +37,7 @@ void utf_erase_left(UTFString* str, size_t how_many);
 typedef struct UTFStringView {
     char* data;
     size_t data_size; //does not include null terminated character
+    size_t count;
 }UTFStringView;
 
 size_t utf_sv_count_to_byte(UTFStringView sv, size_t index);
@@ -62,6 +63,8 @@ bool utf_sv_cmp(UTFStringView str1, UTFStringView str2);
 
 int utf_sv_find(UTFStringView str, UTFStringView to_find);
 int utf_sv_find_last(UTFStringView str, UTFStringView to_find);
+int utf_sv_find_left_from(UTFStringView str, UTFStringView to_find);
+int utf_sv_find_right_from(UTFStringView str, UTFStringView to_find);
 
 bool utf_test();
 
