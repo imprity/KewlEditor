@@ -66,7 +66,8 @@ int main(int argc, char* argv[])
     // end of load font
     ////////////////////////////////
 
-    TextBox* box = text_box_create(u8"hello\n world", 600, 600, font, renderer);
+    //TextBox* box = text_box_create(u8"Hello\nWorld", 600, 600, font, renderer);
+    TextBox* box = text_box_create(u8"", 600, 600, font, renderer);
 
     ////////////////////////////////
     // event loop
@@ -84,7 +85,7 @@ int main(int argc, char* argv[])
         goto cleanup;
     }
 
-    text_box_render(box, renderer);
+    text_box_render(box);
 
     while  (!quit) {
         while (SDL_PollEvent(&event)) {
@@ -95,8 +96,7 @@ int main(int argc, char* argv[])
             }break;
             
             case SDL_TEXTINPUT: {
-                utf_insert(box->str, box->cursor_pos, event.text.text);
-                text_box_move_cursor_right(box);
+                text_box_type(box, event.text.text);
                 text_changed = true;
                 text_box_render(box, renderer);
             }
@@ -106,17 +106,16 @@ int main(int argc, char* argv[])
             case SDL_KEYDOWN: {
                 SDL_Keysym key = event.key.keysym;
                 if (key.scancode == SDL_SCANCODE_RETURN) {
-                    utf_insert(box->str, box->cursor_pos, "\n");
-                    text_box_move_cursor_right(box);
-                    text_box_render(box, renderer);
+                    text_box_type(box, u8"\n");
+                    text_box_render(box);
                 }
                 if (key.scancode == SDL_SCANCODE_LEFT) {
                     text_box_move_cursor_left(box);
-                    text_box_render(box, renderer);
+                    text_box_render(box);
                 }
                 if (key.scancode == SDL_SCANCODE_RIGHT) {
                     text_box_move_cursor_right(box);
-                    text_box_render(box, renderer);
+                    text_box_render(box);
                 }
             }break;
             }

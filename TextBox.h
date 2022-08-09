@@ -9,21 +9,24 @@ typedef struct TextBox{
     UTFString* str;
     size_t w;
     size_t h;
-    size_t str_start;
-    size_t str_end;
     size_t cursor_pos;
     TTF_Font* font;
     SDL_Texture* texture;
+
+    SDL_Texture* paper_texture;
+    int paper_texture_w;
+    int paper_texture_h;
+
+    SDL_Renderer* renderer;
+    int offset_y;
 }TextBox;
 
 TextBox* text_box_create(const char* text, size_t w, size_t h, TTF_Font* font, SDL_Renderer* renderer);
 void text_box_destroy(TextBox* box);
 
-size_t text_box_calculate_str_end(TextBox* box);
+void text_box_type(TextBox* box, char* c);
 
-size_t text_box_calculate_str_start(TextBox* box);
-
-void text_box_render(TextBox* box, SDL_Renderer* renderer);
+void text_box_render(TextBox* box);
 
 void text_box_move_cursor_left(TextBox* box);
 void text_box_move_cursor_right(TextBox* box);

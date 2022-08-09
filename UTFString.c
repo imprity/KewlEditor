@@ -526,8 +526,8 @@ int utf_sv_find_left_from(UTFStringView str, UTFStringView to_find, size_t from)
 
 int utf_sv_find_right_from(UTFStringView str, UTFStringView to_find, size_t from)
 {
-    UTFStringView sub = utf_sv_sub_sv(str, from, sub.count);
-    size_t found_at = utf_sv_find_last(sub, to_find);
+    UTFStringView sub = utf_sv_sub_sv(str, from, str.count);
+    int found_at = utf_sv_find(sub, to_find);
     if(found_at < 0){
         return -1;
     }
