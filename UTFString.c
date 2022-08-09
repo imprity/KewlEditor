@@ -19,7 +19,7 @@ size_t utf8_get_length(const char* str) {
 }
 
 bool utf_is_valid(UTFString *str){
-    if( str->count != utf_count(*str)){
+    if( str->count != utf8_get_length(str->data)){
         fprintf(stderr, "%s:%d:ERROR : str is not valid!!!", __FILE__, __LINE__);
         fprintf(stderr, " cached count : %zu, count : %zu\n", str->count, utf_count(*str));
         return false;
@@ -76,7 +76,7 @@ void utf_grow(UTFString* str, size_t needed_size) {
     }
 }
 
-UTFString* utf_create(const char* str) {
+UTFString* utf_from_cstr(const char* str) {
     UTFString* to_return = malloc(sizeof(UTFString));
 
     //copy str
@@ -98,6 +98,28 @@ UTFString* utf_create(const char* str) {
         to_return->data_size = 0;
         to_return->count = 0;
     }
+
+    return to_return;
+}
+
+UTFString* utf_from_sv(UTFStringView sv)
+{
+    UTFString* to_return = malloc(sizeof(UTFString));
+
+    size_t str_len = sv.data_size;
+    size_t null_included = str_len + 1;
+
+    to_return->raw_size = calculate_size(null_included);
+
+    to_return->data = malloc(to_return->raw_size);
+    to_return->data_size = str_len;
+    memcpy(to_return->data, sv.data, str_len);
+    to_return->count = sv.count;
+
+    //make it null terminated
+    to_return->data[to_return->data_size] = 0;
+
+    utf_is_valid(to_return);
 
     return to_return;
 }
@@ -173,6 +195,52 @@ void utf_insert(UTFString* str, size_t at, const char* to_insert) {
 
     size_t str_count = utf8_get_length(to_insert);
     str->count += str_count;
+
+    utf_is_valid(str);
+}
+
+void utf_append_sv(UTFString* str, UTFStringView to_append)
+{
+    size_t str_len = to_append.data_size;
+    size_t null_included = str_len + 1;
+
+    utf_grow(str, null_included + str->data_size);
+
+    memcpy(str->data + str->data_size, to_append.data, str_len);
+    str->data_size += str_len;
+
+    str->data[str->data_size] = 0;
+
+    str->count += to_append.count;
+
+    utf_is_valid(str);
+}
+
+void utf_insert_sv(UTFString* str, size_t at, UTFStringView to_insert)
+{
+    size_t char_count = str->count;
+    if (at > char_count) {
+        fprintf(stderr, "%s:%d:ERROR : at(%zu) is bigger than string size(%zu)\n", __FILE__, __LINE__, at, char_count);
+        return;
+    }
+
+    at = utf_count_to_byte(str, at);
+
+    size_t str_len = to_insert.count;
+    size_t null_included = str_len + 1;
+
+    utf_grow(str, null_included + str->data_size);
+
+    //last+1 > at instead of last >= at because it wraps aroud when at is 0
+    for (size_t last = str->data_size - 1; last + 1 > at; last--) {
+        str->data[last + str_len] = str->data[last];
+    }
+
+    memcpy(str->data + at, to_insert.data, str_len);
+    str->data_size += str_len;
+    str->data[str->data_size] = 0;
+
+    str->count += to_insert.count;
 
     utf_is_valid(str);
 }
@@ -566,84 +634,84 @@ void utf_sv_fprintln(UTFStringView sv, FILE* file)
 bool utf_test()
 {
     {
-        UTFString* str = utf_create(u8"일이삼사오");
-        assert(utf_sv_cmp(utf_sv_sub_str(*str, 0, 1), utf_sv_from_cstr(u8"일")));
+        UTFString* str = utf_from_cstr(u8"abcde");
+        assert(utf_sv_cmp(utf_sv_sub_str(*str, 0, 1), utf_sv_from_cstr(u8"a")));
         utf_erase_left(str, 1);
-        assert(utf_sv_cmp(utf_sv_sub_str(*str, 0, 1), utf_sv_from_cstr(u8"이")));
+        assert(utf_sv_cmp(utf_sv_sub_str(*str, 0, 1), utf_sv_from_cstr(u8"b")));
         utf_erase_left(str, 1);
-        assert(utf_sv_cmp(utf_sv_sub_str(*str, 0, 1), utf_sv_from_cstr(u8"삼")));
+        assert(utf_sv_cmp(utf_sv_sub_str(*str, 0, 1), utf_sv_from_cstr(u8"c")));
         utf_erase_left(str, 1);
-        assert(utf_sv_cmp(utf_sv_sub_str(*str, 0, 1), utf_sv_from_cstr(u8"사")));
+        assert(utf_sv_cmp(utf_sv_sub_str(*str, 0, 1), utf_sv_from_cstr(u8"d")));
         utf_erase_left(str, 1);
-        assert(utf_sv_cmp(utf_sv_sub_str(*str, 0, 1), utf_sv_from_cstr(u8"오")));
+        assert(utf_sv_cmp(utf_sv_sub_str(*str, 0, 1), utf_sv_from_cstr(u8"e")));
         utf_erase_left(str, 1);
         assert(str->count == 0);
         utf_destroy(str);
     }
 
     {
-        UTFString* str = utf_create(u8"일이삼사오");
-        assert(utf_sv_cmp(utf_sv_sub_str(*str, str->count - 1, str->count), utf_sv_from_cstr(u8"오")));
+        UTFString* str = utf_from_cstr(u8"abcde");
+        assert(utf_sv_cmp(utf_sv_sub_str(*str, str->count - 1, str->count), utf_sv_from_cstr(u8"e")));
         utf_erase_right(str, 1);
-        assert(utf_sv_cmp(utf_sv_sub_str(*str, str->count - 1, str->count), utf_sv_from_cstr(u8"사")));
+        assert(utf_sv_cmp(utf_sv_sub_str(*str, str->count - 1, str->count), utf_sv_from_cstr(u8"d")));
         utf_erase_right(str, 1);
-        assert(utf_sv_cmp(utf_sv_sub_str(*str, str->count - 1, str->count), utf_sv_from_cstr(u8"삼")));
+        assert(utf_sv_cmp(utf_sv_sub_str(*str, str->count - 1, str->count), utf_sv_from_cstr(u8"c")));
         utf_erase_right(str, 1);
-        assert(utf_sv_cmp(utf_sv_sub_str(*str, str->count - 1, str->count), utf_sv_from_cstr(u8"이")));
+        assert(utf_sv_cmp(utf_sv_sub_str(*str, str->count - 1, str->count), utf_sv_from_cstr(u8"b")));
         utf_erase_right(str, 1);
-        assert(utf_sv_cmp(utf_sv_sub_str(*str, str->count - 1, str->count), utf_sv_from_cstr(u8"일")));
+        assert(utf_sv_cmp(utf_sv_sub_str(*str, str->count - 1, str->count), utf_sv_from_cstr(u8"a")));
         utf_erase_right(str, 1);
         assert(str->count == 0);
         utf_destroy(str);
     }
 
     {
-        UTFStringView str = utf_sv_from_cstr(u8"일이삼사오");
-        assert(utf_sv_cmp(utf_sv_sub_sv(str, 0, 1), utf_sv_from_cstr(u8"일")));
+        UTFStringView str = utf_sv_from_cstr(u8"abcde");
+        assert(utf_sv_cmp(utf_sv_sub_sv(str, 0, 1), utf_sv_from_cstr(u8"a")));
         str = utf_sv_trim_left(str, 1);
-        assert(utf_sv_cmp(utf_sv_sub_sv(str, 0, 1), utf_sv_from_cstr(u8"이")));
+        assert(utf_sv_cmp(utf_sv_sub_sv(str, 0, 1), utf_sv_from_cstr(u8"b")));
         str = utf_sv_trim_left(str, 1);
-        assert(utf_sv_cmp(utf_sv_sub_sv(str, 0, 1), utf_sv_from_cstr(u8"삼")));
+        assert(utf_sv_cmp(utf_sv_sub_sv(str, 0, 1), utf_sv_from_cstr(u8"c")));
         str = utf_sv_trim_left(str, 1);
-        assert(utf_sv_cmp(utf_sv_sub_sv(str, 0, 1), utf_sv_from_cstr(u8"사")));
+        assert(utf_sv_cmp(utf_sv_sub_sv(str, 0, 1), utf_sv_from_cstr(u8"d")));
         str = utf_sv_trim_left(str, 1);
-        assert(utf_sv_cmp(utf_sv_sub_sv(str, 0, 1), utf_sv_from_cstr(u8"오")));
+        assert(utf_sv_cmp(utf_sv_sub_sv(str, 0, 1), utf_sv_from_cstr(u8"e")));
         str = utf_sv_trim_left(str, 1);
         assert(str.count == 0);
     }
 
     {
-        UTFStringView str = utf_sv_from_cstr(u8"일이삼사오");
-        assert(utf_sv_cmp(utf_sv_sub_sv(str, str.count-1, str.count), utf_sv_from_cstr(u8"오")));
+        UTFStringView str = utf_sv_from_cstr(u8"abcde");
+        assert(utf_sv_cmp(utf_sv_sub_sv(str, str.count-1, str.count), utf_sv_from_cstr(u8"e")));
         str = utf_sv_trim_right(str, 1);
-        assert(utf_sv_cmp(utf_sv_sub_sv(str, str.count - 1, str.count), utf_sv_from_cstr(u8"사")));
+        assert(utf_sv_cmp(utf_sv_sub_sv(str, str.count - 1, str.count), utf_sv_from_cstr(u8"d")));
         str = utf_sv_trim_right(str, 1);
-        assert(utf_sv_cmp(utf_sv_sub_sv(str, str.count - 1, str.count), utf_sv_from_cstr(u8"삼")));
+        assert(utf_sv_cmp(utf_sv_sub_sv(str, str.count - 1, str.count), utf_sv_from_cstr(u8"c")));
         str = utf_sv_trim_right(str, 1);
-        assert(utf_sv_cmp(utf_sv_sub_sv(str, str.count - 1, str.count), utf_sv_from_cstr(u8"이")));
+        assert(utf_sv_cmp(utf_sv_sub_sv(str, str.count - 1, str.count), utf_sv_from_cstr(u8"b")));
         str = utf_sv_trim_right(str, 1);
-        assert(utf_sv_cmp(utf_sv_sub_sv(str, str.count - 1, str.count), utf_sv_from_cstr(u8"일")));
+        assert(utf_sv_cmp(utf_sv_sub_sv(str, str.count - 1, str.count), utf_sv_from_cstr(u8"a")));
         str = utf_sv_trim_right(str, 1);
         assert(str.count == 0);
     }
 
     {
-        UTFStringView sv = utf_sv_from_cstr(u8"그냥 좀 긴글");
-        assert(utf_sv_find(sv, utf_sv_from_cstr(u8"존재하지 않는 것")) < 0);
-        assert(utf_sv_find_last(sv, utf_sv_from_cstr(u8"존재하지 않는 것")) < 0);
+        UTFStringView sv = utf_sv_from_cstr(u8"Long Text");
+        assert(utf_sv_find(sv, utf_sv_from_cstr(u8"does not exist")) < 0);
+        assert(utf_sv_find_last(sv, utf_sv_from_cstr(u8"does not exist")) < 0);
 
-        UTFStringView seven = utf_sv_from_cstr(u8"글씨 일곱개.");
+        UTFStringView seven = utf_sv_from_cstr(u8"!seven!");
         assert(utf_sv_count(seven) == 7);
-        size_t middle = utf_sv_find(seven, utf_sv_from_cstr(u8"일"));
+        size_t middle = utf_sv_find(seven, utf_sv_from_cstr(u8"v"));
         assert(middle == 3);
     }
 
 
     {
-        UTFString* short_str = utf_create(u8"짧은글\n");
-        utf_erase_left(short_str, 1);
+        UTFString* short_str = utf_from_cstr(u8"short");
+        utf_erase_left(short_str, 2);
         utf_erase_right(short_str, 2);
-        assert(utf_sv_cmp(utf_sv_from_str(*short_str), utf_sv_from_cstr(u8"은")));
+        assert(utf_sv_cmp(utf_sv_from_str(*short_str), utf_sv_from_cstr(u8"o")));
         assert(utf_count(*short_str) == 1);
         assert(short_str->count == 1);
         utf_destroy(short_str);

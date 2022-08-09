@@ -10,11 +10,13 @@
 
 #include "UTFString.h"
 #include "TextBox.h"
+#include "TextLine.h"
 #include <Windows.h>
 
 
 int main(int argc, char* argv[])
 {
+    text_line_test();
     utf_test();
     bool init_success = true;
     ////////////////////////////////
@@ -66,8 +68,12 @@ int main(int argc, char* argv[])
     // end of load font
     ////////////////////////////////
 
-    //TextBox* box = text_box_create(u8"Hello\nWorld", 600, 600, font, renderer);
-    TextBox* box = text_box_create(u8"", 600, 600, font, renderer);
+    TextBox* box = text_box_create(
+        u8"This Is a very long sample text Yo.\n"
+        u8"So very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very\n"
+        u8"LOOOOOOOOOOOOOOOONG~~~~~~\n", 
+        600, 600, font, renderer);
+    //TextBox* box = text_box_create(u8"Hello", 600, 600, font, renderer);
 
     ////////////////////////////////
     // event loop

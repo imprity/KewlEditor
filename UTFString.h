@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 typedef struct UTFString {
     char* data;
@@ -14,10 +15,17 @@ typedef struct UTFString {
     size_t count;
 }UTFString;
 
+typedef struct UTFStringView {
+    char* data;
+    size_t data_size; //does not include null terminated character
+    size_t count;
+}UTFStringView;
+
 size_t utf_count_to_byte(UTFString* str, size_t count);
 size_t utf_byte_to_count(UTFString* str, size_t byte);
 
-UTFString* utf_create(const char* str);
+UTFString* utf_from_cstr(const char* str);
+UTFString* utf_from_sv(UTFStringView sv);
 void utf_destroy(UTFString* str);
 
 size_t utf_count(UTFString str);
@@ -28,17 +36,16 @@ size_t utf_next(UTFString str, size_t pos);
 size_t utf_prev(UTFString str, size_t pos);
 
 void utf_append(UTFString* str, const char* to_append);
-void utf_insert(UTFString* str, size_t at, const char* to_append);
+void utf_insert(UTFString* str, size_t at, const char* to_insert);
+
+void utf_append_sv(UTFString* str, UTFStringView to_append);
+void utf_insert_sv(UTFString* str, size_t at, UTFStringView to_insert);
 
 void utf_erase_range(UTFString* str, size_t from, size_t to);
 void utf_erase_right(UTFString* str, size_t how_many);
 void utf_erase_left(UTFString* str, size_t how_many);
 
-typedef struct UTFStringView {
-    char* data;
-    size_t data_size; //does not include null terminated character
-    size_t count;
-}UTFStringView;
+
 
 size_t utf_sv_count_to_byte(UTFStringView sv, size_t index);
 size_t utf_sv_byte_to_count(UTFStringView sv, size_t index);
@@ -68,6 +75,9 @@ int utf_sv_find_right_from(UTFStringView str, UTFStringView to_find, size_t from
 
 bool utf_sv_starts_with(UTFStringView sv, UTFStringView with);
 bool utf_sv_ends_with(UTFStringView sv, UTFStringView with);
+
+void utf_sv_fprint(UTFStringView sv, FILE* file);
+void utf_sv_fprintln(UTFStringView sv, FILE* file);
 
 bool utf_test();
 

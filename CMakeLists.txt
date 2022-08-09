@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.0)
 
 project(KewlEditor)
 
-set(SRCS main.c stb_truetype.h UTFString.c UTFString.h TextBox.c TextBox.h)
+set(SRCS main.c stb_truetype.h UTFString.c UTFString.h TextBox.c TextBox.h TextLine.c TextLine.h)
 
 add_executable(KewlEditor ${SRCS}) 
 

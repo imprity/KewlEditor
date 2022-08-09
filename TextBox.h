@@ -2,20 +2,21 @@
 #define TextBox_HEADER_GUARD
 
 #include "UTFString.h"
+#include "TextLine.h"
 #include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL.h>
 
 typedef struct TextBox{
-    UTFString* str;
     size_t w;
     size_t h;
-    size_t cursor_pos;
+
+    TextLine* cursor_line;
+    TextLine* first_line;
+
+    size_t cursor_offset;
+
     TTF_Font* font;
     SDL_Texture* texture;
-
-    SDL_Texture* paper_texture;
-    int paper_texture_w;
-    int paper_texture_h;
 
     SDL_Renderer* renderer;
     int offset_y;

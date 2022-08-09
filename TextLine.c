@@ -1,0 +1,175 @@
+#include "TextLine.h"
+
+#include <stdlib.h>
+
+TextLine* text_line_create(UTFString *str, size_t line_number)
+{
+    TextLine *line = malloc(sizeof(TextLine));
+    line->prev = NULL;
+    line->next = NULL;
+
+    if (str == NULL) {
+        line->str = utf_from_cstr(u8"");
+    }
+    else{
+        line->str = str;
+    }
+    
+
+    line->size_x = 0;
+    line->size_y = 0;
+
+    line->line_number = line_number;
+
+    return line;
+}
+
+void text_line_destroy(TextLine* line)
+{
+    if(line->str){
+        utf_destroy(line->str);
+    }
+
+    TextLine* prev_line = line->prev;
+    TextLine* next_line = line->next;
+
+    if(prev_line){
+        prev_line->next = next_line;
+    }
+    if(next_line){
+        next_line->prev = prev_line;
+    }
+
+    free(line);
+}
+
+void text_line_set_number_left(TextLine* from, size_t line_num)
+{
+    TextLine *current_line = from;
+    for(size_t i=line_num; i>0; i--){
+        current_line->line_number = line_num;
+        current_line = current_line->prev;
+        if(!current_line){
+            break;
+        }
+    }
+}
+
+void text_line_set_number_right(TextLine* from, size_t line_num)
+{
+    for(TextLine* line = from; line != NULL; line = line->next){
+        line->line_number = line_num;
+        line_num++;
+    }
+}
+
+void text_line_push_back(TextLine* line, TextLine* to_push)
+{
+    if(line->next == NULL){
+        line->next = to_push;
+        to_push->prev = line;
+    }
+    else{
+        text_line_push_back(line->next, to_push);
+    }
+}
+
+void text_line_push_front(TextLine* line, TextLine* to_push)
+{
+    if(line->prev == NULL){
+        line->prev = to_push;
+        to_push->next = line;
+    }
+    else{
+        text_line_push_front(line->prev, to_push);
+    }
+}
+
+void text_line_insert_left(TextLine* line, TextLine* to_insert)
+{
+    TextLine* prev_left = line->prev;
+
+    line->prev = to_insert;
+    to_insert->next = line;
+    to_insert->prev = prev_left;
+    if(prev_left){
+        prev_left->next = to_insert;
+    }
+}
+
+void text_line_insert_right(TextLine* line, TextLine* to_insert)
+{
+    TextLine* prev_right = line->next;
+
+    line->next = to_insert;
+    to_insert->prev = line;
+    to_insert->next = prev_right;
+    if(prev_right){
+        prev_right->prev = to_insert;
+    }
+}
+
+TextLine* create_lines_from_str(char *str)
+{
+    if (str == NULL) {
+        return text_line_create(utf_from_cstr(NULL), 0);
+    }
+
+    UTFStringView sv = utf_sv_from_cstr(str);
+
+    if (sv.count == 0) {
+        return text_line_create(utf_from_sv(sv), 0);
+    }
+
+    TextLine *first = NULL;
+    TextLine *last = NULL;
+
+    size_t line_number = 0;
+    
+    while(sv.count != 0){
+        int new_line_at = utf_sv_find(sv, utf_sv_from_cstr(u8"\n"));
+
+        bool found_new_line = new_line_at >= 0;
+
+        if(!found_new_line){
+            new_line_at = sv.count;
+        }
+
+        UTFStringView line = utf_sv_sub_sv(sv, 0, new_line_at);
+        sv = utf_sv_trim_left(sv, new_line_at);
+
+        if (found_new_line) {
+            sv = utf_sv_trim_left(sv, 1);
+        }
+
+        if(first == NULL){
+            first = text_line_create(utf_from_sv(line), line_number++);
+            last = first;
+        }
+        else{
+            TextLine* to_push = text_line_create(utf_from_sv(line), line_number++);
+            text_line_push_back(last, to_push);
+            last = to_push;
+        }
+    }
+
+    return first;
+}
+
+void text_line_test()
+{
+    TextLine* first = create_lines_from_str(
+        u8"This is long line of texts\n"
+        u8"To see if TextLine works\n"
+        u8"If it doesn't....\n"
+        u8"Then I guess we'll have to better..\n"
+        u8"If you don't want to see this Text\n"
+        u8"Comment the function \"text_line_text()\"\n"
+        u8"\n"
+        u8"\n"
+    );
+
+    for (TextLine* line = first; line != NULL; line = line->next) {
+        printf("%d : %s\n",line->line_number, line->str->data);
+    }
+}
