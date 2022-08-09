@@ -29,7 +29,7 @@ bool sv_fits(UTFStringView sv, TTF_Font* font, int w, size_t* text_count, int* t
 
 void calculate_cursor_pos(TextBox* box, int* cursor_x, int* cursor_y)
 {
-	int offset_y = box->offset_y;
+	int offset_y = 0;
 	size_t line_number = box->cursor_line->line_number;
 
 	{
@@ -41,7 +41,7 @@ void calculate_cursor_pos(TextBox* box, int* cursor_x, int* cursor_y)
 			}
 			else {
 				fprintf(stderr, "%s:%d:ERROR : Failed to get a cursor y offset\n", __FILE__, __LINE__);
-				fprintf(stderr, "line %d does not have a next line\n", line->line_number);
+				fprintf(stderr, "line %zu does not have a next line\n", line->line_number);
 				return;
 			}
 		}
@@ -54,8 +54,8 @@ void calculate_cursor_pos(TextBox* box, int* cursor_x, int* cursor_y)
 	UTFStringView sv = utf_sv_sub_str(*(box->cursor_line->str), 0, box->cursor_offset);
 
 	size_t fit_count = 0;
-	int measured_x;
-	while (! sv_fits(sv, box->font, box->w, &fit_count, &measured_x)) {
+	int measured_x = 0;
+	while (! sv_fits(sv, box->font, box->w, &fit_count, &measured_x) ) {
 		sv = utf_sv_trim_left(sv, fit_count);
 		offset_y += font_height;
 	}
@@ -72,16 +72,19 @@ void calculate_line_size(TextBox* box, TextLine* line, int* size_x, int* size_y)
 	UTFStringView sv = utf_sv_from_str(*(line->str));
 	int font_height = TTF_FontHeight(box->font);
 
-	size_t fit = 0;
-
 	int y = 0;
-
-	while (sv.count > 0) {
-		bool fits = sv_fits(sv, box->font, box->w, &fit, NULL);
-
-		sv = utf_sv_trim_left(sv, fit);
-
+	if (sv.count == 0) {
 		y += font_height;
+	}
+	else {
+		size_t fit = 0;
+		while (sv.count > 0) {
+			bool fits = sv_fits(sv, box->font, box->w, &fit, NULL);
+
+			sv = utf_sv_trim_left(sv, fit);
+
+			y += font_height;
+		}
 	}
 
 	if (size_x) {
@@ -183,6 +186,20 @@ void text_box_type(TextBox* box, char* c)
 	else {
 		utf_insert(cursor_line->str, box->cursor_offset, c);
 		box->cursor_offset += to_insert.count;
+		int size_x = 0;
+		int size_y = 0;
+		calculate_line_size(box, cursor_line, &size_x, &size_y);
+		cursor_line->size_x = size_x;
+		cursor_line->size_y = size_y;
+	}
+
+	int font_height = TTF_FontHeight(box->font);
+
+	int cursor_x = 0;
+	int cursor_y = 0;
+	calculate_cursor_pos(box, &cursor_x, &cursor_y);
+	if (cursor_y + box->offset_y > box->h - font_height) {
+		box->offset_y = box->h - cursor_y - font_height;
 	}
 }
 
@@ -215,6 +232,7 @@ void text_box_render(TextBox* box) {
 		}
 		else if(offset_y + line->size_y > 0) {
 			if (line->str->count == 0) {
+				offset_y += line->size_y;
 				continue;
 			}
 			UTFStringView sv = utf_sv_from_str(*(line->str));
@@ -265,7 +283,7 @@ void text_box_render(TextBox* box) {
 	int cursor_y = 0;
 	
 	calculate_cursor_pos(box, &cursor_x, &cursor_y);
-	SDL_Rect cursor_rect = { .x = cursor_x, .y = cursor_y + 2, .w = 2, .h = font_height - 2 };
+	SDL_Rect cursor_rect = { .x = cursor_x, .y = cursor_y + 2 + box->offset_y, .w = 2, .h = font_height - 2 };
 
 	SDL_SetRenderDrawColor(box->renderer, color.r, color.g, color.b, color.a);
 	SDL_RenderFillRect(box->renderer, &cursor_rect);
@@ -278,12 +296,17 @@ void text_box_render(TextBox* box) {
 
 void text_box_move_cursor_left(TextBox* box)
 {
-	// TODO : Properly handle cursor movement
-	if (box->cursor_offset <= 0) {
-		return;
-	}
-
 	box->cursor_offset -= 1;
+
+	if (box->cursor_offset < 0) {
+		if (box->cursor_line == box->first_line) {
+			box->cursor_offset = 0;
+		}
+		else {
+			box->cursor_line = box->cursor_line->prev;
+			box->cursor_offset = box->cursor_line->str->count;
+		}
+	}
 	
 	int cursor_x = 0;
 	int cursor_y = 0;
@@ -296,11 +319,17 @@ void text_box_move_cursor_left(TextBox* box)
 void text_box_move_cursor_right(TextBox* box)
 {
 	// TODO : Properly handle cursor movement
-	if (box->cursor_offset >= box->cursor_line->str->count) {
-		return;
-	}
-
 	box->cursor_offset += 1;
+
+	if (box->cursor_offset > box->cursor_line->str->count) {
+		if (box->cursor_line->next) {
+			box->cursor_line = box->cursor_line->next;
+			box->cursor_offset = 0;
+		}
+		else {
+			box->cursor_offset = box->cursor_line->str->count;
+		}
+	}
 
 	int font_height = TTF_FontHeight(box->font);
 

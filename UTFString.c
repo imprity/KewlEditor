@@ -5,6 +5,10 @@
 #include <assert.h>
 #include <stdio.h>
 
+//TODO : For some weird reason when I enable inline option
+//it casues weird bug. Probably there's somthing wrong on this code
+//or compiler is just being weird..
+
 ///////////////////////
 // utf8 utills
 ///////////////////////
@@ -22,6 +26,11 @@ bool utf_is_valid(UTFString *str){
     if( str->count != utf8_get_length(str->data)){
         fprintf(stderr, "%s:%d:ERROR : str is not valid!!!", __FILE__, __LINE__);
         fprintf(stderr, " cached count : %zu, count : %zu\n", str->count, utf_count(*str));
+        return false;
+    }
+    if (str->data[str->data_size] != 0) {
+        fprintf(stderr, "%s:%d:ERROR : str is not valid!!!", __FILE__, __LINE__);
+        fprintf(stderr, " str is not null terminated");
         return false;
     }
     return true;
@@ -98,6 +107,8 @@ UTFString* utf_from_cstr(const char* str) {
         to_return->data_size = 0;
         to_return->count = 0;
     }
+
+    utf_is_valid(to_return);
 
     return to_return;
 }
@@ -320,20 +331,21 @@ void utf_erase_left(UTFString* str, size_t how_many)
 }
 
 ////////////////////////////
-// Strinv View Functions
+// String View Functions
 ////////////////////////////
 
 size_t utf_sv_count_to_byte(UTFStringView sv, size_t count) 
 {
-    if (count == 0) {
+    int count_copy = count;
+    if (count_copy == 0) {
         return 0;
     }
-    count++;
+    count_copy++;
     for(size_t i=0; i< sv.data_size; i++){
         if ((sv.data[i] & 0b11000000) != 0b10000000) {
-            count--;
+            count_copy--;
         }
-        if(count == 0){
+        if(count_copy == 0){
             return i;
         }
     }
@@ -362,14 +374,9 @@ UTFStringView utf_sv_from_str(UTFString str) {
     return sv;
 }
 
-UTFStringView utf_sv_sub_str(UTFString str, size_t from, size_t to) {
+UTFStringView utf_sv_sub_str(UTFString str, size_t from, size_t to) 
+{
     size_t sv_count = str.count;
-    if (to <= from) {
-        size_t tmp = to;
-        to = from;
-        from = tmp;
-    }
-
     if (sv_count <= to) {
         to = sv_count;
     }
@@ -378,9 +385,16 @@ UTFStringView utf_sv_sub_str(UTFString str, size_t from, size_t to) {
         from = sv_count;
     }
 
+    if (to < from) {
+        size_t tmp = to;
+        to = from;
+        from = tmp;
+    }
+
     UTFStringView sv;
 
     sv.count = to - from;
+    
 
     from = utf_count_to_byte(&str, from);
     to = utf_count_to_byte(&str, to);
@@ -396,18 +410,18 @@ UTFStringView utf_sv_sub_str(UTFString str, size_t from, size_t to) {
 UTFStringView utf_sv_sub_sv(UTFStringView str, size_t from, size_t to) 
 {
     size_t sv_count = str.count;
-    if (to <= from) {
-        size_t tmp = to;
-        to = from;
-        from = tmp;
-    }
-
     if (sv_count <= to) {
         to = sv_count;
     }
 
     if (sv_count <= from) {
         from = sv_count;
+    }
+
+    if (to < from) {
+        size_t tmp = to;
+        to = from;
+        from = tmp;
     }
 
     UTFStringView sv;
@@ -433,9 +447,12 @@ UTFStringView utf_sv_copy(UTFStringView sv)
 size_t utf_sv_count(UTFStringView sv)
 {
     size_t count = 0;
-    while (sv.data_size--) {
-        count += (*sv.data++ & 0xC0) != 0x80;
+    for (size_t i = 0; i < sv.data_size; i++) {
+        if ((sv.data[i] & 0b11000000) != 0b10000000) {
+            count++;
+        }
     }
+
     return count;
 }
 
@@ -496,7 +513,6 @@ UTFStringView utf_sv_trim_left(UTFStringView sv, size_t how_many)
 {
     size_t sv_count = sv.count;
     if (how_many >= sv_count) {
-        sv.data += sv.data_size;
         sv.data_size = 0;
         sv.count = 0;
         return sv;
@@ -519,7 +535,6 @@ UTFStringView utf_sv_trim_right(UTFStringView sv, size_t how_many)
 
     if (how_many >= sv_count) {
         sv.data_size = 0;
-        sv.count = 0;
         sv.count = 0;
         return sv;
     }

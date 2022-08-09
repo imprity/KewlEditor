@@ -7,13 +7,13 @@
 #include <SDL2/SDL.h>
 
 typedef struct TextBox{
-    size_t w;
-    size_t h;
+    int w;
+    int h;
 
     TextLine* cursor_line;
     TextLine* first_line;
 
-    size_t cursor_offset;
+    int cursor_offset;
 
     TTF_Font* font;
     SDL_Texture* texture;

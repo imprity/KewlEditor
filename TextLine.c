@@ -170,6 +170,6 @@ void text_line_test()
     );
 
     for (TextLine* line = first; line != NULL; line = line->next) {
-        printf("%d : %s\n",line->line_number, line->str->data);
+        printf("%zu : %s\n",line->line_number, line->str->data);
     }
 }

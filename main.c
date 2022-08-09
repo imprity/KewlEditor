@@ -68,12 +68,16 @@ int main(int argc, char* argv[])
     // end of load font
     ////////////////////////////////
 
-    TextBox* box = text_box_create(
+    /*TextBox* box = text_box_create(
         u8"This Is a very long sample text Yo.\n"
         u8"So very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very\n"
+        u8"\n"
+        u8"\n"
+        u8"\n"
+        u8"\n"
         u8"LOOOOOOOOOOOOOOOONG~~~~~~\n", 
-        600, 600, font, renderer);
-    //TextBox* box = text_box_create(u8"Hello", 600, 600, font, renderer);
+        600, 600, font, renderer);*/
+    TextBox* box = text_box_create("", 600, 600, font, renderer);
 
     ////////////////////////////////
     // event loop
