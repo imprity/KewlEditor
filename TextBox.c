@@ -4,27 +4,55 @@
 #include <stdio.h>
 
 bool sv_fits(UTFStringView sv, TTF_Font* font, int w, size_t* text_count, int* text_width) {
-	char tmp = sv.data[sv.data_size];
-	sv.data[sv.data_size] = 0;
-
-	int measured_count = 0;
-	int measured_width = 0;
-
-	//TODO : it doesn't acount for line wrapping rule
-	//we just believe what TTF_MeasureText saids
-	if (TTF_MeasureUTF8(font, sv.data, w, &measured_width, &measured_count) != 0) {
-		fprintf(stderr, "%s:%d:ERROR : failed to measure a string!!! : %s\n", __FILE__, __LINE__, SDL_GetError());
-		return 0;
+	if (sv.count == 0) {
+		if (text_count) {
+			*text_count = 0;
+		}
+		if (*text_width) {
+			*text_width = 0;
+		}
+		return true;
 	}
 
-	sv.data[sv.data_size] = tmp;
+	size_t return_count = 0;
+	int return_width = 0;
 
-	if (text_count)
-		*text_count = measured_count;
-	if (text_width)
-		*text_width = measured_width;
+	int measured_width = 0;
+	int measured_height = 0;
+	bool fits = true;
 
-	return measured_count == utf_sv_count(sv);
+	UTFStringView sub_sv = utf_sv_sub_sv(sv, 0, 0);
+
+	for (size_t i = 0; i < sv.count; i++) {
+		return_width = measured_width;
+		return_count = i;
+
+		sub_sv = utf_sv_sub_sv(sv, 0, i + 1);
+
+		char tmp = sub_sv.data[sub_sv.data_size];
+		sub_sv.data[sub_sv.data_size] = 0;
+		TTF_SizeUTF8(font, sub_sv.data, &measured_width, &measured_height);
+		sub_sv.data[sub_sv.data_size] = tmp;
+
+		if (measured_width > w) {
+			sub_sv = utf_sv_trim_right(sub_sv, 1);
+			fits = false;
+			break;
+		}
+		else if(i + 1 == sv.count) {
+			return_width = measured_width;
+			return_count = i + 1;
+		}
+	}
+
+	if (text_count) {
+		*text_count = return_count;
+	}
+	if (text_width) {
+		*text_width = return_width;
+	}
+
+	return fits;
 }
 
 size_t get_cursor_char_offset(TextBox* box) {
@@ -273,10 +301,10 @@ void text_box_type(TextBox* box, char* c)
 		box->offset_y = box->h - cursor_y - font_height;
 	}
 
-	printf("cursor offset x : %zu\n", box->cursor_offset_x);
-	printf("cursor offset y : %zu\n", box->cursor_offset_y);
-	printf("line number     : %zu\n", box->cursor_line->line_number);
-	printf("\n");
+	//printf("cursor offset x : %zu\n", box->cursor_offset_x);
+	//printf("cursor offset y : %zu\n", box->cursor_offset_y);
+	//printf("line number     : %zu\n", box->cursor_line->line_number);
+	//printf("\n");
 }
 
 void text_box_render(TextBox* box) {
@@ -404,10 +432,10 @@ void text_box_move_cursor_left(TextBox* box)
 		box->offset_y = -cursor_y;
 	}
 
-	printf("cursor offset x : %zu\n", box->cursor_offset_x);
-	printf("cursor offset y : %zu\n", box->cursor_offset_y);
-	printf("line number     : %zu\n", box->cursor_line->line_number);
-	printf("\n");
+	//printf("cursor offset x : %zu\n", box->cursor_offset_x);
+	//printf("cursor offset y : %zu\n", box->cursor_offset_y);
+	//printf("line number     : %zu\n", box->cursor_line->line_number);
+	//printf("\n");
 }
 
 void text_box_move_cursor_right(TextBox* box)
@@ -442,10 +470,10 @@ void text_box_move_cursor_right(TextBox* box)
 		box->offset_y = box->h - cursor_y - font_height;
 	}
 
-	printf("cursor offset x : %zu\n", box->cursor_offset_x);
-	printf("cursor offset y : %zu\n", box->cursor_offset_y);
-	printf("line number     : %zu\n", box->cursor_line->line_number);
-	printf("\n");
+	//printf("cursor offset x : %zu\n", box->cursor_offset_x);
+	//printf("cursor offset y : %zu\n", box->cursor_offset_y);
+	//printf("line number     : %zu\n", box->cursor_line->line_number);
+	//printf("\n");
 }
 
 void text_box_move_cursor_up(TextBox* box)
@@ -467,10 +495,10 @@ void text_box_move_cursor_up(TextBox* box)
 		box->offset_y = -cursor_y;
 	}
 
-	printf("cursor offset x : %zu\n", box->cursor_offset_x);
-	printf("cursor offset y : %zu\n", box->cursor_offset_y);
-	printf("line number     : %zu\n", box->cursor_line->line_number);
-	printf("\n");
+	//printf("cursor offset x : %zu\n", box->cursor_offset_x);
+	//printf("cursor offset y : %zu\n", box->cursor_offset_y);
+	//printf("line number     : %zu\n", box->cursor_line->line_number);
+	//printf("\n");
 }
 
 void text_box_move_cursor_down(TextBox* box)
@@ -494,8 +522,8 @@ void text_box_move_cursor_down(TextBox* box)
 		box->offset_y = box->h - cursor_y - font_height;
 	}
 
-	printf("cursor offset x : %zu\n", box->cursor_offset_x);
-	printf("cursor offset y : %zu\n", box->cursor_offset_y);
-	printf("line number     : %zu\n", box->cursor_line->line_number);
-	printf("\n");
+	//printf("cursor offset x : %zu\n", box->cursor_offset_x);
+	//printf("cursor offset y : %zu\n", box->cursor_offset_y);
+	//printf("line number     : %zu\n", box->cursor_line->line_number);
+	//printf("\n");
 }
