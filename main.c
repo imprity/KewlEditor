@@ -135,6 +135,18 @@ int main(int argc, char* argv[])
                     text_box_move_cursor_down(box);
                     text_box_render(box);
                 }
+                ////////////////////////////
+                //for testing copy and pating
+                ////////////////////////////
+                if (key.scancode == SDL_SCANCODE_F1) {
+                    text_box_type(box,
+                        u8"very long text\n"
+                        u8"so so very long!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+                        u8"This is a test string to see if my text editor can handle copy and pasting\n"
+                        u8"press f1!!\n"
+                    );
+                    text_box_render(box);
+                }
             }break;
             }
         }

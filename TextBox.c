@@ -50,7 +50,7 @@ size_t get_cursor_char_offset(TextBox* box) {
 	}
 }
 
-void set_cursor_offsets_from_char_offset(TextBox* box, size_t char_offset) 
+void set_cursor_offsets_from_char_offset(TextBox* box, size_t char_offset)
 {
 	if (char_offset == 0) {
 		box->cursor_offset_x = 0;
@@ -92,16 +92,18 @@ void get_cursor_screen_pos(TextBox* box, int* cursor_x, int* cursor_y)
 
 	int font_height = TTF_FontHeight(box->font);
 
+	offset_y += font_height * box->cursor_offset_y;
+
 	TextLine* cursor_line = box->cursor_line;
 
 	UTFStringView sv = utf_sv_sub_str(*(box->cursor_line->str), 0, get_cursor_char_offset(box));
 
-	size_t fit_count = 0;
-	int measured_x = 0;
-	while (! sv_fits(sv, box->font, box->w, &fit_count, &measured_x) ) {
-		sv = utf_sv_trim_left(sv, fit_count);
-		offset_y += font_height;
+	for (size_t i = 0; i < min(cursor_line->wrapped_line_count, box->cursor_offset_y); i++) {
+		sv = utf_sv_trim_left(sv, cursor_line->wrapped_line_sizes[i]);
 	}
+
+	int measured_x = 0;
+	sv_fits(sv, box->font, box->w, NULL, &measured_x);
 
 	if (cursor_x) {
 		*cursor_x = measured_x;
@@ -235,14 +237,14 @@ void text_box_type(TextBox* box, char* c)
 			//text_line_push_back(new_lines, text_line_create(after_insertion, 0));
 			TextLine* new_lines_last = text_line_last(new_lines);
 			cursor_char_pos = new_lines_last->str->count;
-			utf_append(new_lines_last->str, after_insertion);
+			utf_append(new_lines_last->str, after_insertion->data);
 			utf_destroy(after_insertion);
 		}
 
 		TextLine* new_line_last = text_line_last(new_lines);
 		//update new lines
 		for (TextLine* line = new_lines; line != NULL; line = line->next) {
-			update_text_line(box, new_lines);
+			update_text_line(box, line);
 		}
 		//insert new lines after current line
 		text_line_insert_right(cursor_line, new_lines);
@@ -387,6 +389,11 @@ void text_box_move_cursor_left(TextBox* box)
 		}
 	}
 	else {
+		size_t current_line_size = box->cursor_line->wrapped_line_sizes[min(box->cursor_offset_y, box->cursor_line->wrapped_line_count - 1)];
+		if (box->cursor_offset_x > current_line_size)
+		{
+			box->cursor_offset_x = current_line_size;
+		}
 		box->cursor_offset_x--;
 	}
 	
@@ -396,6 +403,11 @@ void text_box_move_cursor_left(TextBox* box)
 	if (cursor_y + box->offset_y  < 0) {
 		box->offset_y = -cursor_y;
 	}
+
+	printf("cursor offset x : %zu\n", box->cursor_offset_x);
+	printf("cursor offset y : %zu\n", box->cursor_offset_y);
+	printf("line number     : %zu\n", box->cursor_line->line_number);
+	printf("\n");
 }
 
 void text_box_move_cursor_right(TextBox* box)
@@ -429,6 +441,11 @@ void text_box_move_cursor_right(TextBox* box)
 	if (cursor_y + box->offset_y > box->h - font_height) {
 		box->offset_y = box->h - cursor_y - font_height;
 	}
+
+	printf("cursor offset x : %zu\n", box->cursor_offset_x);
+	printf("cursor offset y : %zu\n", box->cursor_offset_y);
+	printf("line number     : %zu\n", box->cursor_line->line_number);
+	printf("\n");
 }
 
 void text_box_move_cursor_up(TextBox* box)
@@ -449,6 +466,11 @@ void text_box_move_cursor_up(TextBox* box)
 	if (cursor_y + box->offset_y < 0) {
 		box->offset_y = -cursor_y;
 	}
+
+	printf("cursor offset x : %zu\n", box->cursor_offset_x);
+	printf("cursor offset y : %zu\n", box->cursor_offset_y);
+	printf("line number     : %zu\n", box->cursor_line->line_number);
+	printf("\n");
 }
 
 void text_box_move_cursor_down(TextBox* box)
@@ -463,10 +485,17 @@ void text_box_move_cursor_down(TextBox* box)
 		}
 	}
 
+	int font_height = TTF_FontHeight(box->font);
+
 	int cursor_x = 0;
 	int cursor_y = 0;
 	get_cursor_screen_pos(box, &cursor_x, &cursor_y);
-	if (cursor_y + box->offset_y < 0) {
-		box->offset_y = -cursor_y;
+	if (cursor_y + box->offset_y > box->h - font_height) {
+		box->offset_y = box->h - cursor_y - font_height;
 	}
+
+	printf("cursor offset x : %zu\n", box->cursor_offset_x);
+	printf("cursor offset y : %zu\n", box->cursor_offset_y);
+	printf("line number     : %zu\n", box->cursor_line->line_number);
+	printf("\n");
 }
