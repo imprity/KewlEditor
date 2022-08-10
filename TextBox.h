@@ -35,4 +35,6 @@ void text_box_move_cursor_right(TextBox* box);
 void text_box_move_cursor_up(TextBox* box);
 void text_box_move_cursor_down(TextBox* box);
 
+void text_box_delete_a_character(TextBox* box);
+
 #endif

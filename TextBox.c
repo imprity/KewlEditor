@@ -527,3 +527,46 @@ void text_box_move_cursor_down(TextBox* box)
 	//printf("line number     : %zu\n", box->cursor_line->line_number);
 	//printf("\n");
 }
+
+void text_box_delete_a_character(TextBox* box)
+{
+	if (box->cursor_line == box->first_line &&
+		box->cursor_offset_x == 0 &&
+		box->cursor_offset_y == 0) {
+		return;
+	}
+
+	size_t char_offset = get_cursor_char_offset(box);
+	if (char_offset <= 0) {
+		if (box->cursor_line->prev == NULL) {
+			return;
+		}
+		TextLine* prev_line = box->cursor_line->prev;
+		size_t line_count = prev_line->str->count;
+		utf_append(prev_line->str, box->cursor_line->str->data);
+		
+		prev_line->next = box->cursor_line->next;
+		if (box->cursor_line->next) {
+			box->cursor_line->next->prev = prev_line;
+		}
+		text_line_destroy(box->cursor_line);
+		box->cursor_line = prev_line;
+
+		text_line_set_number_right(box->cursor_line, box->cursor_line->line_number);
+		update_text_line(box, box->cursor_line);
+
+		set_cursor_offsets_from_char_offset(box, line_count);
+	}
+	else {
+		utf_erase_range(box->cursor_line->str, char_offset - 1, char_offset);
+		update_text_line(box, box->cursor_line);
+		set_cursor_offsets_from_char_offset(box, char_offset - 1);
+	}
+
+	int cursor_x = 0;
+	int cursor_y = 0;
+	get_cursor_screen_pos(box, &cursor_x, &cursor_y);
+	if (cursor_y + box->offset_y < 0) {
+		box->offset_y = -cursor_y;
+	}
+}

@@ -8,6 +8,9 @@
 
 #define TEST_FONT "NotoSansKR-Medium.otf"
 
+#define WIDTH 600
+#define HEIGHT 600
+
 #include "UTFString.h"
 #include "TextBox.h"
 #include "TextLine.h"
@@ -16,6 +19,8 @@
 
 int main(int argc, char* argv[])
 {
+    SetConsoleOutputCP(65001);
+
     text_line_test();
     utf_test();
     bool init_success = true;
@@ -76,14 +81,14 @@ int main(int argc, char* argv[])
         u8"\n"
         u8"\n"
         u8"LOOOOOOOOOOOOOOOONG~~~~~~\n", 
-        600, 600, font, renderer);*/
-    TextBox* box = text_box_create("", 600, 600, font, renderer);
+        WIDTH, HEIGHT, font, renderer);*/
+    TextBox* box = text_box_create("", WIDTH, HEIGHT, font, renderer);
 
     ////////////////////////////////
     // event loop
     ////////////////////////////////
     
-    SDL_Rect rect = { .x = 0,.y = 0,.w = 600, .h = 600 };
+    SDL_Rect rect = { .x = 0,.y = 0,.w = WIDTH, .h = HEIGHT };
     SDL_SetTextInputRect(&rect);
     SDL_StartTextInput();
     assert(SDL_IsTextInputActive());
@@ -108,32 +113,50 @@ int main(int argc, char* argv[])
             case SDL_TEXTINPUT: {
                 text_box_type(box, event.text.text);
                 text_changed = true;
-                text_box_render(box, renderer);
             }
 
             case SDL_TEXTEDITING: {
+                /////////////////////
+                // dump text editing event
+                /////////////////////
+                
+                //printf("\n");
+                //printf(u8"event time tamp : %u\n", event.edit.timestamp);
+                //printf(u8"window id       : %u\n", event.edit.windowID);
+                //printf(u8"edit text       : %s\n", event.edit.text);
+                //printf(u8"edit start loc  : %d\n", event.edit.start);
+                //printf(u8"edit length     : %d\n", event.edit.length);
+                //printf("\n");
+
+                /////////////////////
+                // end of dumping
+                /////////////////////
             }break;
             case SDL_KEYDOWN: {
                 SDL_Keysym key = event.key.keysym;
                 if (key.scancode == SDL_SCANCODE_RETURN) {
                     text_box_type(box, u8"\n");
-                    text_box_render(box);
+                    text_changed = true;
                 }
                 if (key.scancode == SDL_SCANCODE_LEFT) {
                     text_box_move_cursor_left(box);
-                    text_box_render(box);
+                    text_changed = true;
                 }
                 if (key.scancode == SDL_SCANCODE_RIGHT) {
                     text_box_move_cursor_right(box);
-                    text_box_render(box);
+                    text_changed = true;
                 }
                 if (key.scancode == SDL_SCANCODE_UP) {
                     text_box_move_cursor_up(box);
-                    text_box_render(box);
+                    text_changed = true;
                 }
                 if (key.scancode == SDL_SCANCODE_DOWN) {
                     text_box_move_cursor_down(box);
-                    text_box_render(box);
+                    text_changed = true;
+                }
+                if (key.scancode == SDL_SCANCODE_BACKSPACE) {
+                    text_box_delete_a_character(box);
+                    text_changed = true;
                 }
                 ////////////////////////////
                 //for testing copy and pating
@@ -145,15 +168,25 @@ int main(int argc, char* argv[])
                         u8"This is a test string to see if my text editor can handle copy and pasting\n"
                         u8"press f1!!\n"
                     );
-                    text_box_render(box);
+                    text_changed = true;
+                }
+                if (key.scancode == SDL_SCANCODE_F2) {
+                    text_box_type(box,
+                        u8"인간의 천자만홍이 그러므로 곳이 시들어 것은 것이다. 것은 구할 사라지지 얼음에 하였으며, 말이다. 있는 보내는 곧 봄바람이다. 불어 인간의 가슴에 구할 몸이 끓는다. 불어 기관과 뜨거운지라, 쓸쓸한 동력은 봄바람이다. 없으면 할지라도 청춘에서만 사랑의 곧 품으며, 사는가 속에 쓸쓸하랴? 이상 커다란 끓는 희망의 미인을 것은 찬미를 부패뿐이다. 하여도 인생을 되려니와, 자신과 가는 보배를 가는 방황하였으며, 보라. 청춘의 안고, 따뜻한 것이다. 그들의 오아이스도 튼튼하며, 위하여, 우는 힘차게 얼마나 하여도 새가 듣는다. 청춘 놀이 가장 앞이 발휘하기 주는 구할 때문이다.\n"
+                    );
+                    text_changed = true;
                 }
             }break;
             }
         }
+        if (text_changed) {
+            text_box_render(box);
+            text_changed = false;
+        }
         SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
         SDL_RenderClear(renderer);
 
-        SDL_Rect rect = { .x = 0, .y = 0, .w = 600, .h = 600 };
+        SDL_Rect rect = { .x = 0, .y = 0, .w = WIDTH, .h = HEIGHT };
         SDL_RenderFillRect(renderer, &rect);
 
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);

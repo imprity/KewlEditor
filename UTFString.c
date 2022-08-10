@@ -22,7 +22,10 @@ size_t utf8_get_length(const char* str) {
     return count;
 }
 
+#define CHK 0
+
 bool utf_is_valid(UTFString *str){
+#if CHK
     if( str->count != utf8_get_length(str->data)){
         fprintf(stderr, "%s:%d:ERROR : str is not valid!!!", __FILE__, __LINE__);
         fprintf(stderr, " cached count : %zu, count : %zu\n", str->count, utf_count(*str));
@@ -33,15 +36,18 @@ bool utf_is_valid(UTFString *str){
         fprintf(stderr, " str is not null terminated");
         return false;
     }
+#endif
     return true;
 }
 
 bool utf_sv_is_valid(UTFStringView sv){
+#if CHK
     if( sv.count != utf_sv_count(sv)){
         fprintf(stderr, "%s:%d:ERROR : sv is not valid!!!", __FILE__, __LINE__);
         fprintf(stderr, " cached count : %zu, count : %zu\n", sv.count, utf_sv_count(sv));
         return false;
     }
+#endif
     return true;
 }
 
@@ -265,6 +271,7 @@ void utf_insert_sv(UTFString* str, size_t at, UTFStringView to_insert)
     }
 
     memcpy(str->data + at, to_insert.data, str_len);
+    
     str->data_size += str_len;
     str->data[str->data_size] = 0;
 
@@ -294,7 +301,7 @@ void utf_erase_range(UTFString* str, size_t from, size_t to) {
     size_t distance = to - from;
 
     for (size_t i = from; i < str->data_size; i++) {
-        str->data[i - distance] = str->data[i];
+        str->data[i] = str->data[i + distance];
     }
 
     str->data_size -= distance;
@@ -768,6 +775,19 @@ bool utf_test()
         assert(short_str->count == 1);
         utf_destroy(short_str);
     }
+
+    {
+        UTFString* short_str = utf_from_cstr(u8"short");
+        utf_erase_range(short_str, 0, 2);
+        utf_erase_range(short_str, 1, 2);
+        assert(utf_sv_cmp(utf_sv_from_str(*short_str), utf_sv_from_cstr(u8"ot")));
+        utf_erase_range(short_str, 0, 0);
+        assert(utf_sv_cmp(utf_sv_from_str(*short_str), utf_sv_from_cstr(u8"ot")));
+        utf_erase_range(short_str, short_str->count, short_str->count);
+        assert(utf_sv_cmp(utf_sv_from_str(*short_str), utf_sv_from_cstr(u8"ot")));
+        utf_destroy(short_str);
+    }
+
 
     return true;
 }
