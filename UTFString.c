@@ -412,9 +412,18 @@ UTFStringView utf_sv_sub_str(UTFString str, size_t from, size_t to)
 
     sv.count = to - from;
     
-
-    from = utf_count_to_byte(&str, from);
-    to = utf_count_to_byte(&str, to);
+    if (from <= 0) {
+        from = 0;
+    }
+    else {
+        from = utf_count_to_byte(&str, from);
+    }
+    if (to >= str.count) {
+        to = str.data_size;
+    }
+    else {
+        to = utf_count_to_byte(&str, to);
+    }
     
     sv.data_size = to - from;
     sv.data = str.data + from;
@@ -444,8 +453,19 @@ UTFStringView utf_sv_sub_sv(UTFStringView str, size_t from, size_t to)
     UTFStringView sv;
     sv.count = to - from;
 
-    from = utf_sv_count_to_byte(str,from);
-    to = utf_sv_count_to_byte(str, to);
+    if (from <= 0) {
+        from = 0;
+    }
+    else {
+        from = utf_sv_count_to_byte(str, from);
+    }
+    if (to >= str.count) {
+        to = str.data_size;
+    }
+    else {
+        to = utf_sv_count_to_byte(str, to);
+    }
+    
 
     sv.data_size = to - from;
     sv.data = str.data + from;
