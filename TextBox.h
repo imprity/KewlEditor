@@ -13,7 +13,8 @@ typedef struct TextBox{
     TextLine* cursor_line;
     TextLine* first_line;
 
-    int cursor_offset;
+    size_t cursor_offset_x;
+    size_t cursor_offset_y;
 
     TTF_Font* font;
     SDL_Texture* texture;
@@ -31,5 +32,7 @@ void text_box_render(TextBox* box);
 
 void text_box_move_cursor_left(TextBox* box);
 void text_box_move_cursor_right(TextBox* box);
+void text_box_move_cursor_up(TextBox* box);
+void text_box_move_cursor_down(TextBox* box);
 
 #endif

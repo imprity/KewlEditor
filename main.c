@@ -127,6 +127,14 @@ int main(int argc, char* argv[])
                     text_box_move_cursor_right(box);
                     text_box_render(box);
                 }
+                if (key.scancode == SDL_SCANCODE_UP) {
+                    text_box_move_cursor_up(box);
+                    text_box_render(box);
+                }
+                if (key.scancode == SDL_SCANCODE_DOWN) {
+                    text_box_move_cursor_down(box);
+                    text_box_render(box);
+                }
             }break;
             }
         }

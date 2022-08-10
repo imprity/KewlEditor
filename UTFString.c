@@ -135,6 +135,23 @@ UTFString* utf_from_sv(UTFStringView sv)
     return to_return;
 }
 
+UTFString* utf_sub_str(UTFString* str, size_t from, size_t to)
+{
+    //TODO : maybe implement actual function to reduce overhead
+    return utf_from_sv(utf_sv_sub_str(*str, from, to));
+}
+
+UTFString* utf_sub_sv(UTFStringView sv, size_t from, size_t to)
+{
+    return utf_from_sv(utf_sv_sub_sv(sv, from, to));
+}
+
+UTFString* utf_copy(UTFString* str)
+{
+    //TODO : maybe implement actual function to reduce overhead
+    return utf_from_sv(utf_sv_from_str(*str));
+}
+
 void utf_destroy(UTFString* str) {
     if (!str) { return; }
     if (str->data) { free(str->data); }
@@ -237,7 +254,7 @@ void utf_insert_sv(UTFString* str, size_t at, UTFStringView to_insert)
 
     at = utf_count_to_byte(str, at);
 
-    size_t str_len = to_insert.count;
+    size_t str_len = to_insert.data_size;
     size_t null_included = str_len + 1;
 
     utf_grow(str, null_included + str->data_size);

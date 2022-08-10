@@ -26,6 +26,11 @@ size_t utf_byte_to_count(UTFString* str, size_t byte);
 
 UTFString* utf_from_cstr(const char* str);
 UTFString* utf_from_sv(UTFStringView sv);
+
+UTFString* utf_sub_str(UTFString* str, size_t from, size_t to);
+UTFString* utf_sub_sv(UTFStringView sv, size_t from, size_t to);
+UTFString* utf_copy(UTFString* str);
+
 void utf_destroy(UTFString* str);
 
 size_t utf_count(UTFString str);
