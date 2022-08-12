@@ -373,6 +373,7 @@ size_t utf_sv_count_to_byte(UTFStringView sv, size_t count)
             return i;
         }
     }
+    return sv.data_size;
 }
 
 size_t utf_sv_byte_to_count(UTFStringView sv, size_t byte)
