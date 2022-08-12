@@ -91,7 +91,7 @@ bool sv_fits(UTFStringView sv, TTF_Font* font, int w, size_t* text_count, int* t
 
 size_t get_cursor_char_offset(TextBox* box) {
 	TextLine* cursor_line = box->cursor_line;
-	UTFStringView sv = utf_sv_from_str((*cursor_line->str));
+	UTFStringView sv = utf_sv_from_str(cursor_line->str);
 
 	if (cursor_line->wrapped_line_count <= 1) {
 		return min(sv.count, box->cursor_offset_x);
@@ -158,7 +158,7 @@ void get_cursor_screen_pos(TextBox* box, int* cursor_x, int* cursor_y)
 
 	TextLine* cursor_line = box->cursor_line;
 
-	UTFStringView sv = utf_sv_sub_str(*(box->cursor_line->str), 0, get_cursor_char_offset(box));
+	UTFStringView sv = utf_sv_sub_str((box->cursor_line->str), 0, get_cursor_char_offset(box));
 
 	for (size_t i = 0; i < min(cursor_line->wrapped_line_count, box->cursor_offset_y); i++) {
 		sv = utf_sv_trim_left(sv, cursor_line->wrapped_line_sizes[i]);
@@ -197,7 +197,7 @@ void get_screen_pos_from_line_and_char_offset(
 		c += line->wrapped_line_sizes[i];
 	}
 
-	UTFStringView sv = utf_sv_sub_str(*(line->str), c, char_offset);
+	UTFStringView sv = utf_sv_sub_str((line->str), c, char_offset);
 
 	int pixel_offset_x = 0;
 
@@ -217,7 +217,7 @@ void get_screen_pos_from_line_and_char_offset(
 
 void update_text_line(TextBox* box, TextLine* line)
 {
-	UTFStringView sv = utf_sv_from_str(*(line->str));
+	UTFStringView sv = utf_sv_from_str(line->str);
 	int font_height = TTF_FontHeight(box->font);
 
 	if (sv.count == 0) {
@@ -545,7 +545,7 @@ void text_box_render(TextBox* box) {
 				}
 
 				if (outside_selecton || completely_inside_selection) {
-					UTFStringView sv = utf_sv_from_str(*(line->str));
+					UTFStringView sv = utf_sv_from_str(line->str);
 
 					size_t char_offset = 0;
 
@@ -568,7 +568,7 @@ void text_box_render(TextBox* box) {
 					}
 				}
 				else {
-					UTFStringView sv = utf_sv_from_str(*(line->str));
+					UTFStringView sv = utf_sv_from_str(line->str);
 
 					size_t char_offset = 0;
 

@@ -28,7 +28,7 @@ bool utf_is_valid(UTFString *str){
 #if CHK
     if( str->count != utf8_get_length(str->data)){
         fprintf(stderr, "%s:%d:ERROR : str is not valid!!!", __FILE__, __LINE__);
-        fprintf(stderr, " cached count : %zu, count : %zu\n", str->count, utf_count(*str));
+        fprintf(stderr, " cached count : %zu, count : %zu\n", str->count, utf_count(str));
         return false;
     }
     if (str->data[str->data_size] != 0) {
@@ -57,12 +57,12 @@ bool utf_sv_is_valid(UTFStringView sv){
 
 size_t utf_count_to_byte(UTFString* str, size_t count)
 {
-    return utf_sv_count_to_byte(utf_sv_from_str(*str), count);
+    return utf_sv_count_to_byte(utf_sv_from_str(str), count);
 }
 
 size_t utf_byte_to_count(UTFString* str, size_t byte)
 {
-    return utf_sv_byte_to_count(utf_sv_from_str(*str), byte);
+    return utf_sv_byte_to_count(utf_sv_from_str(str), byte);
 }
 
 #define UTF_STR_DEFAULT_ALLOC 128
@@ -144,7 +144,7 @@ UTFString* utf_from_sv(UTFStringView sv)
 UTFString* utf_sub_str(UTFString* str, size_t from, size_t to)
 {
     //TODO : maybe implement actual function to reduce overhead
-    return utf_from_sv(utf_sv_sub_str(*str, from, to));
+    return utf_from_sv(utf_sv_sub_str(str, from, to));
 }
 
 UTFString* utf_sub_sv(UTFStringView sv, size_t from, size_t to)
@@ -155,7 +155,7 @@ UTFString* utf_sub_sv(UTFStringView sv, size_t from, size_t to)
 UTFString* utf_copy(UTFString* str)
 {
     //TODO : maybe implement actual function to reduce overhead
-    return utf_from_sv(utf_sv_from_str(*str));
+    return utf_from_sv(utf_sv_from_str(str));
 }
 
 void utf_destroy(UTFString* str) {
@@ -164,27 +164,27 @@ void utf_destroy(UTFString* str) {
     free(str);
 }
 
-size_t utf_count(UTFString str)
+size_t utf_count(UTFString* str)
 {
     return utf_sv_count(utf_sv_from_str(str));
 }
 
-size_t utf_count_left_from(UTFString str, size_t from)
+size_t utf_count_left_from(UTFString* str, size_t from)
 {
     return utf_sv_count_left_from(utf_sv_from_str(str), from);
 }
 
-size_t utf_count_right_from(UTFString str, size_t from)
+size_t utf_count_right_from(UTFString* str, size_t from)
 {
     return utf_sv_count_right_from(utf_sv_from_str(str), from);
 }
 
-size_t utf_next(UTFString str, size_t pos)
+size_t utf_next(UTFString* str, size_t pos)
 {
     return utf_sv_next(utf_sv_from_str(str), pos);
 }
 
-size_t utf_prev(UTFString str, size_t pos)
+size_t utf_prev(UTFString* str, size_t pos)
 {
     return utf_sv_prev(utf_sv_from_str(str), pos);
 }
@@ -393,14 +393,14 @@ UTFStringView utf_sv_from_cstr(const char* str)
     return sv;
 }
 
-UTFStringView utf_sv_from_str(UTFString str) {
-    UTFStringView sv = {.data = str.data, .data_size = str.data_size, .count = str.count};
+UTFStringView utf_sv_from_str(UTFString* str) {
+    UTFStringView sv = {.data = str->data, .data_size = str->data_size, .count = str->count};
     return sv;
 }
 
-UTFStringView utf_sv_sub_str(UTFString str, size_t from, size_t to) 
+UTFStringView utf_sv_sub_str(UTFString* str, size_t from, size_t to) 
 {
-    size_t sv_count = str.count;
+    size_t sv_count = str->count;
     if (sv_count <= to) {
         to = sv_count;
     }
@@ -423,17 +423,17 @@ UTFStringView utf_sv_sub_str(UTFString str, size_t from, size_t to)
         from = 0;
     }
     else {
-        from = utf_count_to_byte(&str, from);
+        from = utf_count_to_byte(str, from);
     }
-    if (to >= str.count) {
-        to = str.data_size;
+    if (to >= str->count) {
+        to = str->data_size;
     }
     else {
-        to = utf_count_to_byte(&str, to);
+        to = utf_count_to_byte(str, to);
     }
     
     sv.data_size = to - from;
-    sv.data = str.data + from;
+    sv.data = str->data + from;
     
     utf_sv_is_valid(sv);
 
@@ -694,15 +694,15 @@ bool utf_test()
 {
     {
         UTFString* str = utf_from_cstr(u8"abcde");
-        assert(utf_sv_cmp(utf_sv_sub_str(*str, 0, 1), utf_sv_from_cstr(u8"a")));
+        assert(utf_sv_cmp(utf_sv_sub_str(str, 0, 1), utf_sv_from_cstr(u8"a")));
         utf_erase_left(str, 1);
-        assert(utf_sv_cmp(utf_sv_sub_str(*str, 0, 1), utf_sv_from_cstr(u8"b")));
+        assert(utf_sv_cmp(utf_sv_sub_str(str, 0, 1), utf_sv_from_cstr(u8"b")));
         utf_erase_left(str, 1);
-        assert(utf_sv_cmp(utf_sv_sub_str(*str, 0, 1), utf_sv_from_cstr(u8"c")));
+        assert(utf_sv_cmp(utf_sv_sub_str(str, 0, 1), utf_sv_from_cstr(u8"c")));
         utf_erase_left(str, 1);
-        assert(utf_sv_cmp(utf_sv_sub_str(*str, 0, 1), utf_sv_from_cstr(u8"d")));
+        assert(utf_sv_cmp(utf_sv_sub_str(str, 0, 1), utf_sv_from_cstr(u8"d")));
         utf_erase_left(str, 1);
-        assert(utf_sv_cmp(utf_sv_sub_str(*str, 0, 1), utf_sv_from_cstr(u8"e")));
+        assert(utf_sv_cmp(utf_sv_sub_str(str, 0, 1), utf_sv_from_cstr(u8"e")));
         utf_erase_left(str, 1);
         assert(str->count == 0);
         utf_destroy(str);
@@ -710,15 +710,15 @@ bool utf_test()
 
     {
         UTFString* str = utf_from_cstr(u8"abcde");
-        assert(utf_sv_cmp(utf_sv_sub_str(*str, str->count - 1, str->count), utf_sv_from_cstr(u8"e")));
+        assert(utf_sv_cmp(utf_sv_sub_str(str, str->count - 1, str->count), utf_sv_from_cstr(u8"e")));
         utf_erase_right(str, 1);
-        assert(utf_sv_cmp(utf_sv_sub_str(*str, str->count - 1, str->count), utf_sv_from_cstr(u8"d")));
+        assert(utf_sv_cmp(utf_sv_sub_str(str, str->count - 1, str->count), utf_sv_from_cstr(u8"d")));
         utf_erase_right(str, 1);
-        assert(utf_sv_cmp(utf_sv_sub_str(*str, str->count - 1, str->count), utf_sv_from_cstr(u8"c")));
+        assert(utf_sv_cmp(utf_sv_sub_str(str, str->count - 1, str->count), utf_sv_from_cstr(u8"c")));
         utf_erase_right(str, 1);
-        assert(utf_sv_cmp(utf_sv_sub_str(*str, str->count - 1, str->count), utf_sv_from_cstr(u8"b")));
+        assert(utf_sv_cmp(utf_sv_sub_str(str, str->count - 1, str->count), utf_sv_from_cstr(u8"b")));
         utf_erase_right(str, 1);
-        assert(utf_sv_cmp(utf_sv_sub_str(*str, str->count - 1, str->count), utf_sv_from_cstr(u8"a")));
+        assert(utf_sv_cmp(utf_sv_sub_str(str, str->count - 1, str->count), utf_sv_from_cstr(u8"a")));
         utf_erase_right(str, 1);
         assert(str->count == 0);
         utf_destroy(str);
@@ -770,8 +770,8 @@ bool utf_test()
         UTFString* short_str = utf_from_cstr(u8"short");
         utf_erase_left(short_str, 2);
         utf_erase_right(short_str, 2);
-        assert(utf_sv_cmp(utf_sv_from_str(*short_str), utf_sv_from_cstr(u8"o")));
-        assert(utf_count(*short_str) == 1);
+        assert(utf_sv_cmp(utf_sv_from_str(short_str), utf_sv_from_cstr(u8"o")));
+        assert(utf_count(short_str) == 1);
         assert(short_str->count == 1);
         utf_destroy(short_str);
     }
@@ -780,11 +780,11 @@ bool utf_test()
         UTFString* short_str = utf_from_cstr(u8"short");
         utf_erase_range(short_str, 0, 2);
         utf_erase_range(short_str, 1, 2);
-        assert(utf_sv_cmp(utf_sv_from_str(*short_str), utf_sv_from_cstr(u8"ot")));
+        assert(utf_sv_cmp(utf_sv_from_str(short_str), utf_sv_from_cstr(u8"ot")));
         utf_erase_range(short_str, 0, 0);
-        assert(utf_sv_cmp(utf_sv_from_str(*short_str), utf_sv_from_cstr(u8"ot")));
+        assert(utf_sv_cmp(utf_sv_from_str(short_str), utf_sv_from_cstr(u8"ot")));
         utf_erase_range(short_str, short_str->count, short_str->count);
-        assert(utf_sv_cmp(utf_sv_from_str(*short_str), utf_sv_from_cstr(u8"ot")));
+        assert(utf_sv_cmp(utf_sv_from_str(short_str), utf_sv_from_cstr(u8"ot")));
         utf_destroy(short_str);
     }
 

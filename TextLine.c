@@ -147,7 +147,7 @@ TextLine* create_lines_from_cstr(char *str)
 
 TextLine* create_lines_from_str(UTFString* str)
 {
-    UTFStringView sv = utf_sv_from_str(*str);
+    UTFStringView sv = utf_sv_from_str(str);
     return create_lines_from_sv(sv);
 }
 

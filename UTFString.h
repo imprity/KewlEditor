@@ -33,12 +33,12 @@ UTFString* utf_copy(UTFString* str);
 
 void utf_destroy(UTFString* str);
 
-size_t utf_count(UTFString str);
-size_t utf_count_left_from(UTFString str, size_t from);
-size_t utf_count_right_from(UTFString str, size_t from);
+size_t utf_count(UTFString* str);
+size_t utf_count_left_from(UTFString* str, size_t from);
+size_t utf_count_right_from(UTFString* str, size_t from);
 
-size_t utf_next(UTFString str, size_t pos);
-size_t utf_prev(UTFString str, size_t pos);
+size_t utf_next(UTFString* str, size_t pos);
+size_t utf_prev(UTFString* str, size_t pos);
 
 void utf_append(UTFString* str, const char* to_append);
 void utf_insert(UTFString* str, size_t at, const char* to_insert);
@@ -56,8 +56,8 @@ size_t utf_sv_count_to_byte(UTFStringView sv, size_t index);
 size_t utf_sv_byte_to_count(UTFStringView sv, size_t index);
 
 UTFStringView utf_sv_from_cstr(const char * str);
-UTFStringView utf_sv_from_str(UTFString str);
-UTFStringView utf_sv_sub_str(UTFString str, size_t from, size_t to);
+UTFStringView utf_sv_from_str(UTFString* str);
+UTFStringView utf_sv_sub_str(UTFString* str, size_t from, size_t to);
 UTFStringView utf_sv_sub_sv(UTFStringView str, size_t from, size_t to);
 UTFStringView utf_sv_copy(UTFStringView str);
 
