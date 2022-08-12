@@ -22,7 +22,7 @@ size_t utf8_get_length(const char* str) {
     return count;
 }
 
-#define CHK 0
+#define CHK 1
 
 bool utf_is_valid(UTFString *str){
 #if CHK

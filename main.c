@@ -176,6 +176,20 @@ int main(int argc, char* argv[])
                     );
                     text_changed = true;
                 }
+                ////////////////////////////
+                //for testing copy and pating
+                ////////////////////////////
+                if (key.scancode == SDL_SCANCODE_F3) {
+                    if (box->is_selecting) {
+                        text_box_end_selection(box);
+                        printf("selection off\n");
+                    }
+                    else {
+                        text_box_start_selection(box);
+                        printf("selection on\n");
+                    }
+                    text_changed = true;
+                }
             }break;
             }
         }

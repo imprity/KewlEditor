@@ -6,6 +6,14 @@
 #include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL.h>
 
+typedef struct Selection {
+    TextLine* start_line;
+    TextLine* end_line;
+
+    size_t start_char;
+    size_t end_char;
+} Selection;
+
 typedef struct TextBox{
     int w;
     int h;
@@ -21,7 +29,12 @@ typedef struct TextBox{
 
     SDL_Renderer* renderer;
     int offset_y;
+
+    Selection selection;
+    bool is_selecting;
 }TextBox;
+
+
 
 TextBox* text_box_create(const char* text, size_t w, size_t h, TTF_Font* font, SDL_Renderer* renderer);
 void text_box_destroy(TextBox* box);
@@ -36,5 +49,8 @@ void text_box_move_cursor_up(TextBox* box);
 void text_box_move_cursor_down(TextBox* box);
 
 void text_box_delete_a_character(TextBox* box);
+
+void text_box_start_selection(TextBox* box);
+void text_box_end_selection(TextBox* box);
 
 #endif

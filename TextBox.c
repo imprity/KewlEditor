@@ -3,6 +3,9 @@
 #include <SDL2/SDL.h>
 #include <stdio.h>
 
+/*
+* more accurate sv fits function
+* but it is too slow....
 bool sv_fits(UTFStringView sv, TTF_Font* font, int w, size_t* text_count, int* text_width) {
 	if (sv.count == 0) {
 		if (text_count) {
@@ -54,6 +57,37 @@ bool sv_fits(UTFStringView sv, TTF_Font* font, int w, size_t* text_count, int* t
 
 	return fits;
 }
+*/
+
+bool sv_fits(UTFStringView sv, TTF_Font* font, int w, size_t* text_count, int* text_width) {
+	if (sv.count == 0) {
+		if (text_count) {
+			*text_count = 0;
+		}
+		if (*text_width) {
+			*text_width = 0;
+		}
+		return true;
+	}
+
+	int measured_count = 0;
+	int measured_width = 0;
+	bool fits = true;
+
+	char tmp = sv.data[sv.data_size];
+	sv.data[sv.data_size] = 0;
+	TTF_MeasureUTF8(font, sv.data, w, &measured_width, &measured_count);
+	sv.data[sv.data_size] = tmp;
+
+	if (text_count) {
+		*text_count = measured_count;
+	}
+	if (text_width) {
+		*text_width = measured_width;
+	}
+
+	return sv.count == measured_count;
+}
 
 size_t get_cursor_char_offset(TextBox* box) {
 	TextLine* cursor_line = box->cursor_line;
@@ -62,7 +96,7 @@ size_t get_cursor_char_offset(TextBox* box) {
 	if (cursor_line->wrapped_line_count <= 1) {
 		return min(sv.count, box->cursor_offset_x);
 	}
-	
+
 	size_t char_offset = 0;
 	for (size_t i = 0; i < cursor_line->wrapped_line_count; i++) {
 		if (i >= box->cursor_offset_y) {
@@ -71,7 +105,7 @@ size_t get_cursor_char_offset(TextBox* box) {
 
 		//if we are at last line and cursor offset y is bigger then cached wrapped line sizes
 		//then just return the char offset from last line
-		if (i + 1 >= cursor_line->wrapped_line_count) {	
+		if (i + 1 >= cursor_line->wrapped_line_count) {
 			return char_offset + min(box->cursor_offset_x, cursor_line->wrapped_line_sizes[i]);
 		}
 		char_offset += cursor_line->wrapped_line_sizes[i];
@@ -141,8 +175,47 @@ void get_cursor_screen_pos(TextBox* box, int* cursor_x, int* cursor_y)
 	}
 }
 
+void get_screen_pos_from_line_and_char_offset(
+	TextBox* box, TextLine* line, size_t char_offset,
+	int* pos_x, int* pos_y
+)
+{
+	int pixel_offset_y = 0;
 
-void update_text_line(TextBox* box, TextLine* line) 
+	for (TextLine* l = box->first_line; l != line; l = l->next) {
+		pixel_offset_y += l->size_y;
+	}
+
+	int font_height = TTF_FontHeight(box->font);
+
+	size_t c = 0;
+	for (size_t i = 0; i < line->wrapped_line_count; i++) {
+		if (c + line->wrapped_line_sizes[i] >= char_offset) {
+			break;
+		}
+		pixel_offset_y += font_height;
+		c += line->wrapped_line_sizes[i];
+	}
+
+	UTFStringView sv = utf_sv_sub_str(*(line->str), c, char_offset);
+
+	int pixel_offset_x = 0;
+
+	char tmp = sv.data[sv.data_size];
+	sv.data[sv.data_size] = 0;
+	TTF_MeasureUTF8(box->font, sv.data, box->w, &pixel_offset_x, NULL);
+	sv.data[sv.data_size] = tmp;
+
+	if (pos_x) {
+		*pos_x = pixel_offset_x;
+	}
+	if (pos_y) {
+		*pos_y = pixel_offset_y;
+	}
+}
+
+
+void update_text_line(TextBox* box, TextLine* line)
 {
 	UTFStringView sv = utf_sv_from_str(*(line->str));
 	int font_height = TTF_FontHeight(box->font);
@@ -172,10 +245,10 @@ void update_text_line(TextBox* box, TextLine* line)
 			break;
 		}
 	}
-	
+
 }
 
-TextBox* text_box_create(const char* text, size_t w, size_t h, TTF_Font* font, SDL_Renderer* renderer) 
+TextBox* text_box_create(const char* text, size_t w, size_t h, TTF_Font* font, SDL_Renderer* renderer)
 {
 	TextBox* box = malloc(sizeof(TextBox));
 	box->w = w;
@@ -206,6 +279,14 @@ TextBox* text_box_create(const char* text, size_t w, size_t h, TTF_Font* font, S
 		update_text_line(box, line);
 	}
 
+	box->selection.start_char = 0;
+	box->selection.end_char = 0;
+
+	box->selection.start_line = NULL;
+	box->selection.end_line = NULL;
+
+	box->is_selecting = false;
+
 	return box;
 }
 
@@ -221,7 +302,7 @@ void text_box_destroy(TextBox* box)
 		line = tmp_next;
 	}
 
-	if(box->texture)
+	if (box->texture)
 		SDL_DestroyTexture(box->texture);
 
 	free(box);
@@ -238,11 +319,11 @@ void text_box_type(TextBox* box, char* c)
 	if (has_new_line) {
 		//divide typed lines to before new line and after new line
 		UTFStringView before_new_line = utf_sv_sub_sv(sv, 0, new_line_index);
-		UTFStringView after_new_line = utf_sv_sub_sv(sv, new_line_index+1, sv.count);
+		UTFStringView after_new_line = utf_sv_sub_sv(sv, new_line_index + 1, sv.count);
 
 		//create new sub string from original string that starts from insertion point
 		size_t insertion_point = get_cursor_char_offset(box);
-		UTFString *after_insertion = utf_sub_str(cursor_line->str, insertion_point, cursor_line->str->count);
+		UTFString* after_insertion = utf_sub_str(cursor_line->str, insertion_point, cursor_line->str->count);
 
 		//trim current line to where insertion happens
 		utf_erase_right(cursor_line->str, cursor_line->str->count - insertion_point);
@@ -307,6 +388,84 @@ void text_box_type(TextBox* box, char* c)
 	//printf("\n");
 }
 
+size_t get_line_num_from_line_and_char_offset(TextLine* line, size_t char_offset)
+{
+	size_t offset = 0;
+	for (size_t i = 0; i < line->wrapped_line_count; i++) {
+		if (char_offset < offset + line->wrapped_line_sizes[i]) {
+			return i;
+		}
+		offset += line->wrapped_line_sizes[i];
+	}
+	return line->wrapped_line_count - 1;
+}
+
+bool draw_sv(
+	TextBox* box,
+	UTFStringView sv,
+	int pos_x,
+	int pos_y,
+	bool shaded,
+	SDL_Color text_color,
+	SDL_Color fg_color,
+	SDL_Color bg_color,
+	int* rendered_size_x,
+	int* rendered_size_y
+) {
+	if (sv.count == 0) {
+		if (rendered_size_x) {
+			*rendered_size_x = 0;
+		}
+		if (rendered_size_y) {
+			*rendered_size_y = 0;
+		}
+		return true;
+	}
+	SDL_Surface* surface;
+	char tmp = sv.data[sv.data_size];
+	sv.data[sv.data_size] = 0;
+
+	if (!shaded) {
+		surface = TTF_RenderUTF8_Blended(box->font, sv.data, text_color);
+	}
+	else {
+		surface = TTF_RenderUTF8_Shaded(box->font, sv.data, fg_color, bg_color);
+	}
+
+	sv.data[sv.data_size] = tmp;
+
+	if (!surface) {
+		fprintf(stderr, "%s:%d:ERROR : Failed to create a surface for text box\n", __FILE__, __LINE__);
+		fprintf(stderr, "%s\n", SDL_GetError());
+		return false;
+	}
+
+	SDL_Texture* texture = SDL_CreateTextureFromSurface(box->renderer, surface);
+	if (!texture) {
+		fprintf(stderr, "%s:%d:ERROR : Failed to create a texture for text box\n", __FILE__, __LINE__);
+		fprintf(stderr, "%s\n", SDL_GetError());
+		SDL_FreeSurface(surface);
+		return false;
+	}
+
+	SDL_Rect line_rect = { .x = pos_x, .y = pos_y, .w = surface->w, .h = surface->h };
+
+	SDL_RenderCopy(box->renderer, texture, NULL, &line_rect);
+
+	if (rendered_size_x) {
+		*rendered_size_x = surface->w;
+	}
+	if (rendered_size_y) {
+		*rendered_size_y = surface->h;
+	}
+
+	SDL_FreeSurface(surface);
+	SDL_DestroyTexture(texture);
+
+	return true;
+}
+
+
 void text_box_render(TextBox* box) {
 	/////////////////////////////
 	// Set Render Target
@@ -320,63 +479,221 @@ void text_box_render(TextBox* box) {
 	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
 	SDL_RenderClear(renderer);
 
-	
-	/////////////////////////////
-	// Render Text
-	/////////////////////////////
-
 	int font_height = TTF_FontHeight(box->font);
+	SDL_Color text_color = { .r = 255, .g = 255, .b = 255, .a = 255 };
+	SDL_Color cursor_color = { .r = 112, .g = 207, .b = 255, .a = 255 };
+	SDL_Color selection_bg_color = { .r = 255, .g = 255, .b = 255, .a = 255 };
+	SDL_Color selection_fg_color = { .r = 0, .g = 0, .b = 0, .a = 255 };
 
-	int offset_y = box->offset_y;
-	SDL_Color color = {.r = 255, .g = 255, .b = 255, .a = 255};
 
-	for (TextLine* line = box->first_line; line != NULL; line = line->next) {
-		if (offset_y > box->h) {
-			break;
-		}
-		else if(offset_y + line->size_y > 0) {
-			if (line->str->count == 0) {
-				offset_y += line->size_y;
-				continue;
-			}
-			UTFStringView sv = utf_sv_from_str(*(line->str));
+	bool no_selection = !box->is_selecting;
+	no_selection = no_selection ||
+		box->selection.start_line == box->selection.end_line &&
+		box->selection.start_char == box->selection.end_char;
 
-			while (sv.count > 0) {
-				size_t fit_count = 0;
-				bool fits = sv_fits(sv, box->font, box->w, &fit_count, NULL);
-				UTFStringView line_sv = utf_sv_sub_sv(sv, 0, fit_count);
-				sv = utf_sv_trim_left(sv, fit_count);
-
-				char tmp = line_sv.data[line_sv.data_size];
-				line_sv.data[line_sv.data_size] = 0;
-				SDL_Surface* surface = TTF_RenderUTF8_Blended(box->font, line_sv.data, color);
-				line_sv.data[line_sv.data_size] = tmp;
-
-				if (!surface) {
-					fprintf(stderr, "%s:%d:ERROR : Failed to create a surface for text box\n", __FILE__, __LINE__);
-					fprintf(stderr, "%s\n", SDL_GetError());
-					goto renderexit;
-				}
-
-				SDL_Texture* texture = SDL_CreateTextureFromSurface(box->renderer, surface);
-				if (!texture) {
-					fprintf(stderr, "%s:%d:ERROR : Failed to create a texture for text box\n", __FILE__, __LINE__);
-					fprintf(stderr, "%s\n", SDL_GetError());
-					SDL_FreeSurface(surface);
-					goto renderexit;
-				}
-
-				SDL_Rect line_rect = {.x = 0, .y = offset_y, .w = surface->w, .h = surface->h};
-				SDL_RenderCopy(box->renderer, texture, NULL, &line_rect);
-				
-				SDL_FreeSurface(surface);
-				SDL_DestroyTexture(texture);
-				
-				offset_y += font_height;
+	Selection selection = box->selection;
+	if (!no_selection) {
+		if (selection.start_line == selection.end_line) {
+			if (selection.start_char > selection.end_char) {
+				size_t tmp = selection.start_char;
+				selection.start_char = selection.end_char;
+				selection.end_char = tmp;
 			}
 		}
 		else {
-			offset_y += line->size_y;
+			if (box->selection.start_line->line_number > box->selection.end_line->line_number) {
+				selection.start_line = box->selection.end_line;
+				selection.start_char = box->selection.end_char;
+
+				selection.end_line = box->selection.start_line;
+				selection.end_char = box->selection.start_char;
+			}
+		}
+	}
+
+
+	/////////////////////////////
+	// Render Text
+	/////////////////////////////
+	{
+		int pixel_offset_y = box->offset_y;
+
+		for (TextLine* line = box->first_line; line != NULL; line = line->next) {
+			if (pixel_offset_y > box->h) {
+				break;
+			}
+			else if (pixel_offset_y + line->size_y > 0) {
+				if (line->str->count == 0) {
+					pixel_offset_y += line->size_y;
+					continue;
+				}
+
+				bool completely_inside_selection = false;
+				bool partially_inside_selection = false;
+				bool outside_selecton = true;
+
+				if (!no_selection) {
+					completely_inside_selection = (
+						line->line_number > selection.start_line->line_number &&
+						line->line_number < selection.end_line->line_number
+						);
+					partially_inside_selection = (
+						line->line_number == selection.start_line->line_number ||
+						line->line_number == selection.end_line->line_number
+						);
+					outside_selecton = !completely_inside_selection && !partially_inside_selection;
+				}
+
+				if (outside_selecton || completely_inside_selection) {
+					UTFStringView sv = utf_sv_from_str(*(line->str));
+
+					size_t char_offset = 0;
+
+					for (size_t i = 0; i < line->wrapped_line_count; i++) {
+						size_t line_start = char_offset;
+						size_t line_end = line->wrapped_line_sizes[i] + char_offset;
+						
+						UTFStringView line_sv = utf_sv_sub_sv(sv, line_start, line_end);
+						if (
+							!draw_sv(box, line_sv, 0, pixel_offset_y,
+								completely_inside_selection && box->is_selecting,
+								text_color, selection_fg_color, selection_bg_color,
+								NULL, NULL
+							)) 
+						{
+							goto renderexit;
+						}
+						char_offset += line->wrapped_line_sizes[i];
+						pixel_offset_y += font_height;
+					}
+				}
+				else {
+					UTFStringView sv = utf_sv_from_str(*(line->str));
+
+					size_t char_offset = 0;
+
+					for (size_t i = 0; i < line->wrapped_line_count; i++) {
+						size_t line_start = char_offset;
+						size_t line_end = line->wrapped_line_sizes[i] + char_offset;
+						
+						UTFStringView line_sv = utf_sv_sub_sv(sv, line_start, line_end);
+
+						bool left_shaded = selection.end_char <= line_end && selection.end_char >= line_start;
+						left_shaded = left_shaded && (selection.end_line == line);
+
+						bool right_shaded = selection.start_char <= line_end && selection.start_char >= line_start;
+						right_shaded = right_shaded && (selection.start_line == line);
+
+						bool un_shaded = line == selection.start_line && line_end < selection.start_char && line_start < selection.start_char;
+						un_shaded = un_shaded || (line == selection.end_line && line_start > selection.end_char && line_end > selection.end_char);
+
+
+						if (left_shaded && right_shaded) {
+							UTFStringView left = utf_sv_sub_sv(line_sv, 0, selection.start_char - char_offset);
+							UTFStringView right = utf_sv_sub_sv(line_sv, selection.end_char - char_offset, line_sv.count);
+							UTFStringView between = utf_sv_sub_sv(line_sv, selection.start_char - char_offset, selection.end_char - char_offset);
+
+							int pixel_offset_x = 0;
+							int rendered_size_x = 0;
+							if (
+								!draw_sv(box, left, 0, pixel_offset_y,
+									false,
+									text_color, selection_fg_color, selection_bg_color,
+									&rendered_size_x, NULL
+								)) 
+							{
+								goto renderexit;
+							}
+							pixel_offset_x += rendered_size_x;
+							if (
+								!draw_sv(box, between, pixel_offset_x, pixel_offset_y,
+									true,
+									text_color, selection_fg_color, selection_bg_color,
+									&rendered_size_x, NULL
+								)) 
+							{
+								goto renderexit;
+							}
+							pixel_offset_x += rendered_size_x;
+							if (
+								!draw_sv(box, right, pixel_offset_x, pixel_offset_y,
+									false,
+									text_color, selection_fg_color, selection_bg_color,
+									NULL, NULL
+								)) 
+							{
+								goto renderexit;
+							}
+						}
+						else if (left_shaded) {
+							UTFStringView left = utf_sv_sub_sv(line_sv, 0, selection.end_char - char_offset);
+							UTFStringView right = utf_sv_sub_sv(line_sv, selection.end_char - char_offset, line_sv.count);
+							int pixel_offset_x = 0;
+							int rendered_size_x = 0;
+							if (
+								!draw_sv(box, left, 0, pixel_offset_y,
+									true,
+									text_color, selection_fg_color, selection_bg_color,
+									&rendered_size_x, NULL
+								)) 
+							{
+								goto renderexit;
+							}
+							pixel_offset_x += rendered_size_x;
+							if (
+								!draw_sv(box, right, pixel_offset_x, pixel_offset_y,
+									false,
+									text_color, selection_fg_color, selection_bg_color,
+									NULL, NULL
+								)) 
+							{
+								goto renderexit;
+							}
+						}
+						else if (right_shaded) {
+							UTFStringView left = utf_sv_sub_sv(line_sv, 0, selection.start_char - char_offset);
+							UTFStringView right = utf_sv_sub_sv(line_sv, selection.start_char - char_offset, line_sv.count);
+							int pixel_offset_x = 0;
+							int rendered_size_x = 0;
+							if (
+								!draw_sv(box, left, 0, pixel_offset_y,
+									false,
+									text_color, selection_fg_color, selection_bg_color,
+									&rendered_size_x, NULL
+								)) 
+							{
+								goto renderexit;
+							}
+							pixel_offset_x += rendered_size_x;
+							if (
+								!draw_sv(box, right, pixel_offset_x, pixel_offset_y,
+									true,
+									text_color, selection_fg_color, selection_bg_color,
+									NULL, NULL
+								)) 
+							{
+								goto renderexit;
+							}
+						}
+						else {
+							if (
+								!draw_sv(box, line_sv, 0, pixel_offset_y,
+									!un_shaded,
+									text_color, selection_fg_color, selection_bg_color,
+									NULL, NULL
+								))
+							{
+								goto renderexit;
+							}
+						}
+						char_offset += line->wrapped_line_sizes[i];
+						pixel_offset_y += font_height;
+					}
+				}
+			}
+			else {
+				pixel_offset_y += line->size_y;
+			}
 		}
 	}
 
@@ -385,17 +702,22 @@ void text_box_render(TextBox* box) {
 	/////////////////////////////
 	int cursor_x = 0;
 	int cursor_y = 0;
-	
+
 	get_cursor_screen_pos(box, &cursor_x, &cursor_y);
 	SDL_Rect cursor_rect = { .x = cursor_x, .y = cursor_y + 2 + box->offset_y, .w = 2, .h = font_height - 2 };
 
-	SDL_SetRenderDrawColor(box->renderer, color.r, color.g, color.b, color.a);
+	SDL_SetRenderDrawColor(box->renderer, cursor_color.r, cursor_color.g, cursor_color.b, cursor_color.a);
 	SDL_RenderFillRect(box->renderer, &cursor_rect);
 
-	renderexit:
+renderexit:
 
 	//restore render target
 	SDL_SetRenderTarget(renderer, prev_render_target);
+}
+
+void text_box_update_cursor_selection(TextBox* box) {
+	box->selection.end_line = box->cursor_line;
+	box->selection.end_char = get_cursor_char_offset(box);
 }
 
 void text_box_move_cursor_left(TextBox* box)
@@ -424,11 +746,15 @@ void text_box_move_cursor_left(TextBox* box)
 		}
 		box->cursor_offset_x--;
 	}
-	
+
+	if (box->is_selecting) {
+		text_box_update_cursor_selection(box);
+	}
+
 	int cursor_x = 0;
 	int cursor_y = 0;
 	get_cursor_screen_pos(box, &cursor_x, &cursor_y);
-	if (cursor_y + box->offset_y  < 0) {
+	if (cursor_y + box->offset_y < 0) {
 		box->offset_y = -cursor_y;
 	}
 
@@ -444,7 +770,7 @@ void text_box_move_cursor_right(TextBox* box)
 	size_t cursor_line_count = cursor_line->wrapped_line_sizes[min(box->cursor_offset_y, cursor_line->wrapped_line_count - 1)];
 	if (box->cursor_offset_x >= cursor_line_count)
 	{
-		if (box->cursor_offset_y+1 < cursor_line->wrapped_line_count) {
+		if (box->cursor_offset_y + 1 < cursor_line->wrapped_line_count) {
 			box->cursor_offset_y++;
 			box->cursor_offset_x = 0;
 		}
@@ -459,6 +785,10 @@ void text_box_move_cursor_right(TextBox* box)
 	}
 	else {
 		box->cursor_offset_x++;
+	}
+
+	if (box->is_selecting) {
+		text_box_update_cursor_selection(box);
 	}
 
 	int font_height = TTF_FontHeight(box->font);
@@ -488,6 +818,10 @@ void text_box_move_cursor_up(TextBox* box)
 		}
 	}
 
+	if (box->is_selecting) {
+		text_box_update_cursor_selection(box);
+	}
+
 	int cursor_x = 0;
 	int cursor_y = 0;
 	get_cursor_screen_pos(box, &cursor_x, &cursor_y);
@@ -503,7 +837,7 @@ void text_box_move_cursor_up(TextBox* box)
 
 void text_box_move_cursor_down(TextBox* box)
 {
-	if (box->cursor_line->wrapped_line_count > 1 && box->cursor_offset_y < box->cursor_line->wrapped_line_count -1) {
+	if (box->cursor_line->wrapped_line_count > 1 && box->cursor_offset_y < box->cursor_line->wrapped_line_count - 1) {
 		box->cursor_offset_y++;
 	}
 	else {
@@ -511,6 +845,10 @@ void text_box_move_cursor_down(TextBox* box)
 			box->cursor_line = box->cursor_line->next;
 			box->cursor_offset_y = 0;
 		}
+	}
+
+	if (box->is_selecting) {
+		text_box_update_cursor_selection(box);
 	}
 
 	int font_height = TTF_FontHeight(box->font);
@@ -544,7 +882,7 @@ void text_box_delete_a_character(TextBox* box)
 		TextLine* prev_line = box->cursor_line->prev;
 		size_t line_count = prev_line->str->count;
 		utf_append(prev_line->str, box->cursor_line->str->data);
-		
+
 		prev_line->next = box->cursor_line->next;
 		if (box->cursor_line->next) {
 			box->cursor_line->next->prev = prev_line;
@@ -569,4 +907,22 @@ void text_box_delete_a_character(TextBox* box)
 	if (cursor_y + box->offset_y < 0) {
 		box->offset_y = -cursor_y;
 	}
+}
+
+void text_box_start_selection(TextBox* box)
+{
+	box->is_selecting = true;
+
+	size_t char_offset = get_cursor_char_offset(box);
+
+	box->selection.start_line = box->cursor_line;
+	box->selection.start_char = char_offset;
+
+	box->selection.end_line = box->cursor_line;
+	box->selection.end_char = char_offset;
+}
+
+void text_box_end_selection(TextBox* box)
+{
+	box->is_selecting = false;
 }
