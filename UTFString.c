@@ -5,10 +5,6 @@
 #include <assert.h>
 #include <stdio.h>
 
-//TODO : For some weird reason when I enable inline option
-//it casues weird bug. Probably there's somthing wrong on this code
-//or compiler is just being weird..
-
 ///////////////////////
 // utf8 utills
 ///////////////////////
