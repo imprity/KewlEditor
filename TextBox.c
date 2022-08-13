@@ -51,8 +51,23 @@ bool sv_fits(UTFStringView sv, TTF_Font* font, int w, size_t* text_count, int* t
 	return sv.count == measured_count;
 }
 
+TextLine* get_line_from_line_number(TextBox* box, size_t line_number) {
+	TextLine* line = box->first_line;
+	for (size_t i = 0; i < line_number; i++) {
+		if (line->next == NULL) {
+			return line;
+		}
+		line = line->next;
+	}
+	return line;
+}
+
+TextLine* get_cursor_line(TextBox* box) {
+	return get_line_from_line_number(box, box->cursor_line_number);
+}
+
 size_t get_cursor_char_offset(TextBox* box) {
-	TextLine* cursor_line = box->cursor_line;
+	TextLine* cursor_line = get_line_from_line_number(box, box->cursor_line_number);
 	UTFStringView sv = utf_sv_from_str(cursor_line->str);
 
 	if (cursor_line->wrapped_line_count <= 1) {
@@ -83,14 +98,17 @@ void set_cursor_offsets_from_char_offset(TextBox* box, size_t char_offset)
 	}
 	size_t offset_y = 0;
 	size_t total_char = 0;
-	for (int i = 0; i < box->cursor_line->wrapped_line_count; i++) {
-		if (char_offset <= total_char + box->cursor_line->wrapped_line_sizes[i]) {
+
+	TextLine* cursor_line = get_cursor_line(box);
+
+	for (int i = 0; i < cursor_line->wrapped_line_count; i++) {
+		if (char_offset <= total_char + cursor_line->wrapped_line_sizes[i]) {
 			box->cursor_offset_x = char_offset - total_char;
 			box->cursor_offset_y = offset_y;
 			return;
 		}
 		offset_y++;
-		total_char += box->cursor_line->wrapped_line_sizes[i];
+		total_char += cursor_line->wrapped_line_sizes[i];
 	}
 }
 
@@ -146,7 +164,7 @@ void get_screen_pos_from_line_and_char_offset(
 void get_cursor_screen_pos(TextBox* box, int* cursor_x, int* cursor_y)
 {
 	int offset_y = 0;
-	size_t line_number = box->cursor_line->line_number;
+	size_t line_number = box->cursor_line_number;
 
 	{
 		TextLine* line = box->first_line;
@@ -167,9 +185,10 @@ void get_cursor_screen_pos(TextBox* box, int* cursor_x, int* cursor_y)
 
 	offset_y += font_height * box->cursor_offset_y;
 
-	TextLine* cursor_line = box->cursor_line;
+	//TextLine* cursor_line = box->cursor_line;
+	TextLine* cursor_line = get_line_from_line_number(box, box->cursor_line_number);
 
-	UTFStringView sv = utf_sv_sub_str((box->cursor_line->str), 0, get_cursor_char_offset(box));
+	UTFStringView sv = utf_sv_sub_str((cursor_line->str), 0, get_cursor_char_offset(box));
 
 	for (size_t i = 0; i < min(cursor_line->wrapped_line_count, box->cursor_offset_y); i++) {
 		sv = utf_sv_trim_left(sv, cursor_line->wrapped_line_sizes[i]);
@@ -304,7 +323,7 @@ TextBox* text_box_create(
 	SDL_SetTextureBlendMode(box->texture, SDL_BLENDMODE_BLEND);
 
 	box->first_line = create_lines_from_cstr(text);
-	box->cursor_line = box->first_line;
+	box->cursor_line_number = 0;
 
 	//calculate line pixel width and height
 	for (TextLine* line = box->first_line; line != NULL; line = line->next) {
@@ -348,24 +367,13 @@ void text_box_destroy(TextBox* box)
 	free(box);
 }
 
-TextLine* get_line_from_line_number(TextBox* box, size_t line_number) {
-	TextLine* line = box->first_line;
-	for (size_t i = 0; i < line_number; i++) {
-		if (line->next == NULL) {
-			return line;
-		}
-		line = line->next;
-	}
-	return line;
-}
-
 void text_box_type(TextBox* box, char* c)
 {
 	UTFStringView sv = utf_sv_from_cstr(c);
 	int new_line_index = utf_sv_find(sv, utf_sv_from_cstr(u8"\n"));
 	bool has_new_line = new_line_index >= 0;
 
-	TextLine* cursor_line = box->cursor_line;
+	TextLine* cursor_line = get_cursor_line(box);
 
 	if (has_new_line) {
 		//divide typed lines to before new line and after new line
@@ -410,17 +418,17 @@ void text_box_type(TextBox* box, char* c)
 		text_line_insert_right(cursor_line, new_lines);
 		text_line_set_number_right(cursor_line, cursor_line->line_number);
 		//update current line
-		update_text_line(box, box->cursor_line);
+		update_text_line(box, cursor_line);
 
 		//calulate cursor pos
-		box->cursor_line = new_line_last;
+		box->cursor_line_number = new_line_last->line_number;
 		set_cursor_offsets_from_char_offset(box, cursor_char_pos);
 	}
 	else {
 		//utf_append(box->cursor_line->str, c);
 		size_t char_offset = get_cursor_char_offset(box);
-		utf_insert_sv(box->cursor_line->str, char_offset, sv);
-		update_text_line(box, box->cursor_line);
+		utf_insert_sv(cursor_line->str, char_offset, sv);
+		update_text_line(box, cursor_line);
 		set_cursor_offsets_from_char_offset(box, char_offset + sv.count);
 	}
 
@@ -780,7 +788,7 @@ renderexit:
 }
 
 void text_box_update_cursor_selection(TextBox* box) {
-	box->selection.end_line_number = box->cursor_line->line_number;
+	box->selection.end_line_number = box->cursor_line_number;
 	box->selection.end_char = get_cursor_char_offset(box);
 }
 
@@ -788,22 +796,25 @@ void text_box_move_cursor_left(TextBox* box)
 {
 	if (box->cursor_offset_x <= 0) {
 		if (box->cursor_offset_y <= 0) {
-			if (box->cursor_line == box->first_line) {
+			if (box->cursor_line_number == 0) {
 				return;
 			}
 			else {
-				box->cursor_line = box->cursor_line->prev;
-				box->cursor_offset_y = box->cursor_line->wrapped_line_count - 1;
-				box->cursor_offset_x = box->cursor_line->wrapped_line_sizes[box->cursor_line->wrapped_line_count - 1];
+				box->cursor_line_number--;
+				TextLine* new_cursor_line = get_cursor_line(box);
+				box->cursor_offset_y = new_cursor_line->wrapped_line_count - 1;
+				box->cursor_offset_x = new_cursor_line->wrapped_line_sizes[new_cursor_line->wrapped_line_count - 1];
 			}
 		}
 		else {
+			TextLine* cursor_line = get_cursor_line(box);
 			box->cursor_offset_y--;
-			box->cursor_offset_x = box->cursor_line->wrapped_line_sizes[box->cursor_offset_y];
+			box->cursor_offset_x = cursor_line->wrapped_line_sizes[box->cursor_offset_y];
 		}
 	}
 	else {
-		size_t current_line_size = box->cursor_line->wrapped_line_sizes[min(box->cursor_offset_y, box->cursor_line->wrapped_line_count - 1)];
+		TextLine* cursor_line = get_cursor_line(box);
+		size_t current_line_size = cursor_line->wrapped_line_sizes[min(box->cursor_offset_y, cursor_line->wrapped_line_count - 1)];
 		if (box->cursor_offset_x > current_line_size)
 		{
 			box->cursor_offset_x = current_line_size;
@@ -827,7 +838,7 @@ void text_box_move_cursor_left(TextBox* box)
 
 void text_box_move_cursor_right(TextBox* box)
 {
-	TextLine* cursor_line = box->cursor_line;
+	TextLine* cursor_line = get_cursor_line(box);
 	size_t cursor_line_count = cursor_line->wrapped_line_sizes[min(box->cursor_offset_y, cursor_line->wrapped_line_count - 1)];
 	if (box->cursor_offset_x >= cursor_line_count)
 	{
@@ -835,8 +846,8 @@ void text_box_move_cursor_right(TextBox* box)
 			box->cursor_offset_y++;
 			box->cursor_offset_x = 0;
 		}
-		else if (box->cursor_line->next != NULL) {
-			box->cursor_line = box->cursor_line->next;
+		else if (cursor_line->next != NULL) {
+			box->cursor_line_number++;
 			box->cursor_offset_x = 0;
 			box->cursor_offset_y = 0;
 		}
@@ -870,9 +881,10 @@ void text_box_move_cursor_up(TextBox* box)
 		box->cursor_offset_y--;
 	}
 	else {
-		if (box->cursor_line != box->first_line) {
-			box->cursor_line = box->cursor_line->prev;
-			box->cursor_offset_y = box->cursor_line->wrapped_line_count - 1;
+		if (box->cursor_line_number > 0) {
+			box->cursor_line_number --;
+			TextLine* cursor_line = get_cursor_line(box);
+			box->cursor_offset_y = cursor_line->wrapped_line_count - 1;
 		}
 	}
 
@@ -892,12 +904,13 @@ void text_box_move_cursor_up(TextBox* box)
 
 void text_box_move_cursor_down(TextBox* box)
 {
-	if (box->cursor_line->wrapped_line_count > 1 && box->cursor_offset_y < box->cursor_line->wrapped_line_count - 1) {
+	TextLine* cursor_line = get_cursor_line(box);
+	if (cursor_line->wrapped_line_count > 1 && box->cursor_offset_y < cursor_line->wrapped_line_count - 1) {
 		box->cursor_offset_y++;
 	}
 	else {
-		if (box->cursor_line->next) {
-			box->cursor_line = box->cursor_line->next;
+		if (cursor_line->next) {
+			box->cursor_line_number++;
 			box->cursor_offset_y = 0;
 		}
 	}
@@ -920,7 +933,7 @@ void text_box_move_cursor_down(TextBox* box)
 
 void text_box_delete_a_character(TextBox* box)
 {
-	if (box->cursor_line == box->first_line &&
+	if (box->cursor_line_number == 0 &&
 		box->cursor_offset_x == 0 &&
 		box->cursor_offset_y == 0) {
 		return;
@@ -928,28 +941,33 @@ void text_box_delete_a_character(TextBox* box)
 
 	size_t char_offset = get_cursor_char_offset(box);
 	if (char_offset <= 0) {
-		if (box->cursor_line->prev == NULL) {
+		if (box->cursor_line_number == 0) {
 			return;
 		}
-		TextLine* prev_line = box->cursor_line->prev;
-		size_t line_count = prev_line->str->count;
-		utf_append_str(prev_line->str, box->cursor_line->str);
-
-		prev_line->next = box->cursor_line->next;
-		if (box->cursor_line->next) {
-			box->cursor_line->next->prev = prev_line;
+		TextLine* cursor_line = get_cursor_line(box);
+		if (cursor_line->prev == NULL) {
+			return;
 		}
-		text_line_destroy(box->cursor_line);
-		box->cursor_line = prev_line;
+		TextLine* prev_line = cursor_line->prev;
+		size_t line_count = prev_line->str->count;
+		utf_append_str(prev_line->str, cursor_line->str);
 
-		text_line_set_number_right(box->cursor_line, box->cursor_line->line_number);
-		update_text_line(box, box->cursor_line);
+		prev_line->next = cursor_line->next;
+		if (cursor_line->next) {
+			cursor_line->next->prev = prev_line;
+		}
+		text_line_destroy(cursor_line);
+		box->cursor_line_number --;
+
+		text_line_set_number_right(prev_line, prev_line->line_number);
+		update_text_line(box, prev_line);
 
 		set_cursor_offsets_from_char_offset(box, line_count);
 	}
 	else {
-		utf_erase_range(box->cursor_line->str, char_offset - 1, char_offset);
-		update_text_line(box, box->cursor_line);
+		TextLine* cursor_line = get_cursor_line(box);
+		utf_erase_range(cursor_line->str, char_offset - 1, char_offset);
+		update_text_line(box, cursor_line);
 		set_cursor_offsets_from_char_offset(box, char_offset - 1);
 	}
 
@@ -1004,7 +1022,7 @@ void text_box_delete_range(TextBox* box, Selection selection)
 		text_line_destroy(end_line);
 
 		update_text_line(box, start_line);
-		box->cursor_line = start_line;
+		box->cursor_line_number = start_line->line_number;
 		set_cursor_offsets_from_char_offset(box, selection.start_char);
 
 		text_line_set_number_right(start_line, start_line->line_number);
@@ -1020,10 +1038,10 @@ void text_box_start_selection(TextBox* box)
 
 	size_t char_offset = get_cursor_char_offset(box);
 
-	box->selection.start_line_number = box->cursor_line->line_number;
+	box->selection.start_line_number = box->cursor_line_number;
 	box->selection.start_char = char_offset;
 
-	box->selection.end_line_number = box->cursor_line->line_number;
+	box->selection.end_line_number = box->cursor_line_number;
 	box->selection.end_char = char_offset;
 
 	box->need_to_render = true;

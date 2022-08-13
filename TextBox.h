@@ -19,8 +19,9 @@ typedef struct TextBox{
     int w;
     int h;
 
-    TextLine* cursor_line;
     TextLine* first_line;
+
+    size_t cursor_line_number;
 
     size_t cursor_offset_x;
     size_t cursor_offset_y;
