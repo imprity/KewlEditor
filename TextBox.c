@@ -66,31 +66,41 @@ TextLine* get_cursor_line(TextBox* box) {
 	return get_line_from_line_number(box, box->cursor.line_number);
 }
 
-void get_char_coord_from_line_and_char_offset(
-	TextLine* line, size_t char_offset, size_t* x, size_t* y
+void get_char_coord_from_cursor(
+	TextBox* box, Cursor cursor, size_t* x, size_t* y
 ) 
 {
-	if (char_offset == 0) {
+	if (cursor.char_offset == 0) {
 		if (x) {*x = 0;}
 		if (y) { *y = 0; }
 		return;
 	}
-	char total_char_size = 0;
+
+	TextLine* line = get_line_from_line_number(box, cursor.line_number);
+
+	size_t total_char_size = 0;
 	for (size_t i = 0; i < line->wrapped_line_count; i++) {
 		size_t line_size = line->wrapped_line_sizes[i];
 		size_t line_start = total_char_size;
 		size_t line_end = total_char_size + line_size;
 		total_char_size += line_size;
 
-		if (char_offset >= line_start && char_offset < line_end) {
-			//char offset is at the end of the wrapped line and line has a next line wrapped
-			if (char_offset  == line_end && i + 1 < line->wrapped_line_count) {
-				if (x) { *x = 0; }
-				if (y) { *y = i+1; }
-				return;
+		if (cursor.char_offset >= line_start && cursor.char_offset <= line_end) {
+			//char offset is at the end of the wrapped line
+			if (cursor.char_offset  == line_end && i + 1 < line->wrapped_line_count) {
+				if (cursor.place_after_last_char_before_wrapping) {
+					if (x) { *x = cursor.char_offset - line_start; }
+					if (y) { *y = i; }
+					return;
+				}
+				else {
+					if (x) { *x = 0; }
+					if (y) { *y = i + 1; }
+					return;
+				}
 			}
 			else {
-				if (x) { *x = char_offset - line_start; }
+				if (x) { *x = cursor.char_offset - line_start; }
 				if (y) { *y = i ; }
 				return;
 			}
@@ -106,7 +116,7 @@ void get_cursor_screen_pos(TextBox* box, int* cursor_x, int* cursor_y)
 
 	size_t cursor_char_x, cursor_char_y;
 
-	get_char_coord_from_line_and_char_offset(cursor_line, box->cursor.char_offset, &cursor_char_x, &cursor_char_y);
+	get_char_coord_from_cursor(box, box->cursor, &cursor_char_x, &cursor_char_y);
 
 	int offset_y = 0;
 	size_t line_number = box->cursor.line_number;
@@ -254,6 +264,8 @@ TextBox* text_box_create(
 	box->renderer = renderer;
 
 	box->cursor.char_offset = 0;
+	box->cursor.line_number = 0;
+	box->cursor.place_after_last_char_before_wrapping = false;
 
 	box->texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, w, h);
 	if (box->texture == NULL) {
@@ -264,7 +276,6 @@ TextBox* text_box_create(
 	SDL_SetTextureBlendMode(box->texture, SDL_BLENDMODE_BLEND);
 
 	box->first_line = create_lines_from_cstr(text);
-	box->cursor.line_number = 0;
 
 	//calculate line pixel width and height
 	for (TextLine* line = box->first_line; line != NULL; line = line->next) {
@@ -735,6 +746,7 @@ void text_box_update_cursor_selection(TextBox* box) {
 
 void text_box_move_cursor_left(TextBox* box)
 {
+	box->cursor.place_after_last_char_before_wrapping = false;
 	if (box->cursor.char_offset > 0) {
 		box->cursor.char_offset--;
 	}
@@ -763,6 +775,7 @@ void text_box_move_cursor_left(TextBox* box)
 
 void text_box_move_cursor_right(TextBox* box)
 {
+	box->cursor.place_after_last_char_before_wrapping = false;
 	TextLine* cursor_line = get_cursor_line(box);
 
 	if (box->cursor.char_offset < cursor_line->str->count) {
@@ -808,11 +821,12 @@ void text_box_move_cursor_up(TextBox* box)
 	if (box->cursor.char_offset == 0 && box->cursor.line_number == 0) {
 		return;
 	}
+	//box->cursor.place_after_last_char_before_wrapping = true;
 
 	TextLine* cursor_line = get_cursor_line(box);
 	size_t offset_x;
 	size_t offset_y;
-	get_char_coord_from_line_and_char_offset(cursor_line, box->cursor.char_offset, &offset_x, &offset_y);
+	get_char_coord_from_cursor(box, box->cursor, &offset_x, &offset_y);
 
 	if (offset_y == 0) {
 		TextLine* prev_line = cursor_line->prev;
@@ -826,6 +840,12 @@ void text_box_move_cursor_up(TextBox* box)
 		}
 	}
 	else {
+		if (cursor_line->wrapped_line_sizes[offset_y] == offset_x) {
+			box->cursor.place_after_last_char_before_wrapping = true;
+		}
+		else {
+			box->cursor.place_after_last_char_before_wrapping = false;
+		}
 		box->cursor.char_offset = get_char_offset_from_line_and_char_coord(
 			cursor_line,
 			offset_x,
@@ -853,9 +873,14 @@ void text_box_move_cursor_down(TextBox* box)
 
 	size_t offset_x;
 	size_t offset_y;
-	get_char_coord_from_line_and_char_offset(cursor_line, box->cursor.char_offset, &offset_x, &offset_y);
+	get_char_coord_from_cursor(box, box->cursor, &offset_x, &offset_y);
+
+	if (offset_x == 0) {
+		box->cursor.place_after_last_char_before_wrapping = false;
+	}
 
 	if (offset_y + 1 < cursor_line->wrapped_line_count) {
+		
 		box->cursor.char_offset = get_char_offset_from_line_and_char_coord(
 			cursor_line,
 			offset_x,

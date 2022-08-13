@@ -111,19 +111,21 @@ int main(int argc, char* argv[])
     text_box_render(box);
 
     while  (!quit) {
+
+        SDL_WaitEvent(&event);
         uint64_t start_time = SDL_GetTicks64();
 
-        while (SDL_PollEvent(&event)) {
-        //while (SDL_WaitEvent(&event)){
-            text_box_handle_event(box, &event);
-            switch (event.type) {
+        //while (SDL_PollEvent(&event)) {
+        text_box_handle_event(box, &event);
 
-            case SDL_QUIT: {
-                quit = true;
-            }break;
-            
-            }
+        switch (event.type) {
+
+        case SDL_QUIT: {
+            quit = true;
+        }break;
+
         }
+
         text_box_render(box);
 
         SDL_RenderClear(renderer);
@@ -132,6 +134,12 @@ int main(int argc, char* argv[])
         SDL_RenderCopy(renderer, box->texture, NULL, NULL);
         
         SDL_RenderPresent(renderer);
+        
+        uint64_t end_time = (SDL_GetTicks64() - start_time);
+        double fps = end_time == 0 ? 0 : 1000.0 / (double)(end_time);
+        static char tmp_buffer[1024];
+        sprintf_s(tmp_buffer, 1023, "Kewl Editor  FPS : %5.2lf", fps);
+        SDL_SetWindowTitle(win, tmp_buffer);
     }
 
 cleanup :
@@ -139,6 +147,7 @@ cleanup :
     if (renderer) { SDL_DestroyRenderer(renderer); }
     if (font) { TTF_CloseFont(font); }
     if (box) { text_box_destroy(box); }
+    TTF_Quit();
     SDL_Quit();
 
     return 0;

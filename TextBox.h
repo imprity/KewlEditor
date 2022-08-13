@@ -9,8 +9,36 @@
 
 typedef struct Cursor {
     size_t line_number;
-
     size_t char_offset;
+
+    /// <summary>
+    /// This is for the special case when cursor has to be
+    /// at the end of the line wrapped character
+    /// 
+    /// For most cases, if cursor is at the end of the wrapped line
+    /// cursor should move to the start of the next line
+    /// 
+    /// but consider this case
+    /// 
+    /// text box is like this
+    /// 
+    /// |abcde |
+    /// |abcdeI|
+    /// 
+    /// if user moves the cursor up
+    /// 
+    /// |abcdeI|
+    /// |abcde |
+    /// 
+    /// then by the above rule cursor will move to the beginning of the next line
+    /// 
+    /// | abcde|
+    /// |Iabcde|
+    /// 
+    /// we don't want that to happen so below value is there to
+    /// handle these specific cases
+    /// </summary>
+    bool place_after_last_char_before_wrapping;
 } Cursor;
 
 typedef struct Selection {
