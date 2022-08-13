@@ -114,6 +114,7 @@ int main(int argc, char* argv[])
         uint64_t start_time = SDL_GetTicks64();
 
         while (SDL_PollEvent(&event)) {
+        //while (SDL_WaitEvent(&event)){
             text_box_handle_event(box, &event);
             switch (event.type) {
 

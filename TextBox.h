@@ -6,8 +6,14 @@
 #include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL.h>
 
+
+typedef struct Cursor {
+    size_t line_number;
+
+    size_t char_offset;
+} Cursor;
+
 typedef struct Selection {
-    //TextLine* start_line;
     size_t start_line_number;
     size_t end_line_number;
 
@@ -21,10 +27,7 @@ typedef struct TextBox{
 
     TextLine* first_line;
 
-    size_t cursor_line_number;
-
-    size_t cursor_offset_x;
-    size_t cursor_offset_y;
+    Cursor cursor;
 
     TTF_Font* font;
     SDL_Texture* texture;
