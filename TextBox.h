@@ -7,8 +7,9 @@
 #include <SDL2/SDL.h>
 
 typedef struct Selection {
-    TextLine* start_line;
-    TextLine* end_line;
+    //TextLine* start_line;
+    size_t start_line_number;
+    size_t end_line_number;
 
     size_t start_char;
     size_t end_char;

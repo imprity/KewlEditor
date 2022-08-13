@@ -314,8 +314,8 @@ TextBox* text_box_create(
 	box->selection.start_char = 0;
 	box->selection.end_char = 0;
 
-	box->selection.start_line = NULL;
-	box->selection.end_line = NULL;
+	box->selection.start_line_number = 0;
+	box->selection.end_line_number = 0;
 
 	box->is_selecting = false;
 
@@ -346,6 +346,17 @@ void text_box_destroy(TextBox* box)
 		SDL_DestroyTexture(box->texture);
 
 	free(box);
+}
+
+TextLine* get_line_from_line_number(TextBox* box, size_t line_number) {
+	TextLine* line = box->first_line;
+	for (size_t i = 0; i < line_number; i++) {
+		if (line->next == NULL) {
+			return line;
+		}
+		line = line->next;
+	}
+	return line;
 }
 
 void text_box_type(TextBox* box, char* c)
@@ -506,23 +517,19 @@ bool draw_sv(
 Selection normalize_selection(Selection selection)
 {
 	Selection to_return = selection;
-
-	if (selection.start_line == NULL || selection.end_line == NULL) {
-		return to_return;
-	}
 	
-	if (selection.start_line == selection.end_line) {
+	if (selection.start_line_number == selection.end_line_number) {
 		if (selection.start_char > selection.end_char) {
 			to_return.end_char = selection.start_char;
 			to_return.start_char = selection.end_char;
 		}
 	}
 	else {
-		if (selection.start_line->line_number > selection.end_line->line_number) {
-			to_return.start_line = selection.end_line;
+		if (selection.start_line_number > selection.end_line_number) {
+			to_return.start_line_number = selection.end_line_number;
 			to_return.start_char = selection.end_char;
 
-			to_return.end_line = selection.start_line;
+			to_return.end_line_number = selection.start_line_number;
 			to_return.end_char = selection.start_char;
 		}
 	}
@@ -554,7 +561,7 @@ void text_box_render(TextBox* box) {
 
 	bool no_selection = !box->is_selecting;
 	no_selection = no_selection ||
-		box->selection.start_line == box->selection.end_line &&
+		box->selection.start_line_number == box->selection.end_line_number &&
 		box->selection.start_char == box->selection.end_char;
 
 	Selection selection = normalize_selection(box->selection);
@@ -584,12 +591,12 @@ void text_box_render(TextBox* box) {
 
 			if (!no_selection) {
 				completely_inside_selection = (
-					line->line_number > selection.start_line->line_number &&
-					line->line_number < selection.end_line->line_number
+					line->line_number > selection.start_line_number &&
+					line->line_number < selection.end_line_number
 					);
 				partially_inside_selection = (
-					line->line_number == selection.start_line->line_number ||
-					line->line_number == selection.end_line->line_number
+					line->line_number == selection.start_line_number ||
+					line->line_number == selection.end_line_number
 					);
 				outside_selecton = !completely_inside_selection && !partially_inside_selection;
 			}
@@ -635,13 +642,13 @@ void text_box_render(TextBox* box) {
 					UTFStringView line_sv = utf_sv_sub_sv(sv, line_start, line_end);
 
 					bool left_shaded = selection.end_char <= line_end && selection.end_char >= line_start;
-					left_shaded = left_shaded && (selection.end_line == line);
+					left_shaded = left_shaded && (selection.end_line_number == line->line_number);
 
 					bool right_shaded = selection.start_char <= line_end && selection.start_char >= line_start;
-					right_shaded = right_shaded && (selection.start_line == line);
+					right_shaded = right_shaded && (selection.start_line_number == line->line_number);
 
-					bool un_shaded = line == selection.start_line && line_end < selection.start_char && line_start < selection.start_char;
-					un_shaded = un_shaded || (line == selection.end_line && line_start > selection.end_char && line_end > selection.end_char);
+					bool un_shaded = line->line_number == selection.start_line_number && line_end < selection.start_char && line_start < selection.start_char;
+					un_shaded = un_shaded || (line->line_number == selection.end_line_number && line_start > selection.end_char && line_end > selection.end_char);
 
 
 					if (left_shaded && right_shaded) {
@@ -773,7 +780,7 @@ renderexit:
 }
 
 void text_box_update_cursor_selection(TextBox* box) {
-	box->selection.end_line = box->cursor_line;
+	box->selection.end_line_number = box->cursor_line->line_number;
 	box->selection.end_char = get_cursor_char_offset(box);
 }
 
@@ -960,14 +967,13 @@ void text_box_delete_range(TextBox* box, Selection selection)
 {
 	selection = normalize_selection(selection);
 
-	if (selection.end_line == NULL || selection.start_line == NULL) {
-		return;
-	}
+	TextLine* start_line = get_line_from_line_number(box, selection.start_line_number);
+	TextLine* end_line = get_line_from_line_number(box, selection.end_line_number);
 
-	if (selection.start_line == selection.end_line) {
-		utf_erase_range(selection.start_line->str, selection.start_char, selection.end_char);
+	if (selection.start_line_number == selection.end_line_number) {
+		utf_erase_range(start_line->str, selection.start_char, selection.end_char);
 		set_cursor_offsets_from_char_offset(box, selection.start_char);
-		update_text_line(box, selection.start_line);
+		update_text_line(box, start_line);
 		box->need_to_render = true;
 
 		// TODOOOOOOOOOO : All these funcitons violate single responsibility principle...
@@ -975,8 +981,8 @@ void text_box_delete_range(TextBox* box, Selection selection)
 	}
 	else {
 		//first get texts after selection end char
-		UTFString *start_str = selection.start_line->str;
-		UTFString *end_str = selection.end_line->str;
+		UTFString *start_str = start_line->str;
+		UTFString *end_str = end_line->str;
 		UTFStringView after_selection_end_char = utf_sv_sub_str(end_str, selection.end_char, end_str->count);
 
 		//erase start_str after selection start char
@@ -985,23 +991,23 @@ void text_box_delete_range(TextBox* box, Selection selection)
 		utf_append_sv(start_str, after_selection_end_char);
 
 		//free lines between start and end
-		assert(selection.start_line->next != NULL);
-		for (TextLine* line = selection.start_line->next; line != selection.end_line;) {
+		assert(start_line->next != NULL);
+		for (TextLine* line = start_line->next; line != end_line;) {
 			TextLine* tmp = line->next;
 			text_line_destroy(line);
 			line = tmp;
 		}
-		selection.start_line->next = selection.end_line->next;
-		if (selection.end_line->next) {
-			selection.end_line->next->prev = selection.start_line;
+		start_line->next = end_line->next;
+		if (end_line->next) {
+			end_line->next->prev = start_line;
 		}
-		text_line_destroy(selection.end_line);
+		text_line_destroy(end_line);
 
-		update_text_line(box, selection.start_line);
-		box->cursor_line = selection.start_line;
+		update_text_line(box, start_line);
+		box->cursor_line = start_line;
 		set_cursor_offsets_from_char_offset(box, selection.start_char);
 
-		text_line_set_number_right(selection.start_line, selection.start_line->line_number);
+		text_line_set_number_right(start_line, start_line->line_number);
 
 		// TODOOOOOOOOOO : All these funcitons violate single responsibility principle...
 		text_box_end_selection(box);
@@ -1014,10 +1020,10 @@ void text_box_start_selection(TextBox* box)
 
 	size_t char_offset = get_cursor_char_offset(box);
 
-	box->selection.start_line = box->cursor_line;
+	box->selection.start_line_number = box->cursor_line->line_number;
 	box->selection.start_char = char_offset;
 
-	box->selection.end_line = box->cursor_line;
+	box->selection.end_line_number = box->cursor_line->line_number;
 	box->selection.end_char = char_offset;
 
 	box->need_to_render = true;
