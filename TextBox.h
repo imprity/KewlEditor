@@ -88,17 +88,17 @@ void text_box_destroy(TextBox* box);
 
 void text_box_handle_event(TextBox* box, SDL_Event* event);
 
-void text_box_type(TextBox* box, char* c);
+Cursor text_box_type(TextBox* box, Cursor cursor, char* c);
 
 void text_box_render(TextBox* box);
 
-void text_box_move_cursor_left(TextBox* box);
-void text_box_move_cursor_right(TextBox* box);
-void text_box_move_cursor_up(TextBox* box);
-void text_box_move_cursor_down(TextBox* box);
+Cursor text_box_move_cursor_left(TextBox* box, Cursor cursor);
+Cursor text_box_move_cursor_right(TextBox* box, Cursor cursor);
+Cursor text_box_move_cursor_up(TextBox* box, Cursor cursor);
+Cursor text_box_move_cursor_down(TextBox* box, Cursor cursor);
 
-void text_box_delete_a_character(TextBox* box);
-void text_box_delete_range(TextBox* box, Selection selection);
+Cursor text_box_delete_a_character(TextBox* box, Cursor cursor);
+Cursor text_box_delete_range(TextBox* box, Selection selection);
 
 void text_box_start_selection(TextBox* box);
 void text_box_end_selection(TextBox* box);
