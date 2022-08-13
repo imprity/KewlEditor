@@ -40,10 +40,13 @@ size_t utf_count_right_from(UTFString* str, size_t from);
 size_t utf_next(UTFString* str, size_t pos);
 size_t utf_prev(UTFString* str, size_t pos);
 
-void utf_append(UTFString* str, const char* to_append);
-void utf_insert(UTFString* str, size_t at, const char* to_insert);
-
+void utf_append_cstr(UTFString* str, const char* to_append);
+void utf_append_str(UTFString* str, UTFString* to_append);
 void utf_append_sv(UTFString* str, UTFStringView to_append);
+
+
+void utf_insert_cstr(UTFString* str, size_t at, const char* to_insert);
+void utf_insert_str(UTFString* str, size_t at, UTFString* to_insert);
 void utf_insert_sv(UTFString* str, size_t at, UTFStringView to_insert);
 
 void utf_erase_range(UTFString* str, size_t from, size_t to);

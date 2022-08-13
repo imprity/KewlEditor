@@ -32,16 +32,6 @@ void text_line_destroy(TextLine* line)
         utf_destroy(line->str);
     }
 
-    TextLine* prev_line = line->prev;
-    TextLine* next_line = line->next;
-
-    if(prev_line){
-        prev_line->next = next_line;
-    }
-    if(next_line){
-        next_line->prev = prev_line;
-    }
-
     free(line);
 }
 

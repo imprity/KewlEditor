@@ -185,7 +185,7 @@ size_t utf_prev(UTFString* str, size_t pos)
     return utf_sv_prev(utf_sv_from_str(str), pos);
 }
 
-void utf_append(UTFString* str, const char* to_append) {
+void utf_append_cstr(UTFString* str, const char* to_append) {
     size_t str_len = strlen(to_append);
     size_t null_included = str_len + 1;
 
@@ -200,7 +200,29 @@ void utf_append(UTFString* str, const char* to_append) {
     utf_is_valid(str);
 }
 
-void utf_insert(UTFString* str, size_t at, const char* to_insert) {
+void utf_append_str(UTFString* str, UTFString* to_append)
+{
+    utf_append_sv(str, utf_sv_from_str(to_append));
+}
+
+void utf_append_sv(UTFString* str, UTFStringView to_append)
+{
+    size_t str_len = to_append.data_size;
+    size_t null_included = str_len + 1;
+
+    utf_grow(str, null_included + str->data_size);
+
+    memcpy(str->data + str->data_size, to_append.data, str_len);
+    str->data_size += str_len;
+
+    str->data[str->data_size] = 0;
+
+    str->count += to_append.count;
+
+    utf_is_valid(str);
+}
+
+void utf_insert_cstr(UTFString* str, size_t at, const char* to_insert) {
     size_t char_count = str->count;
     if (at > char_count) {
         fprintf(stderr, "%s:%d:ERROR : at(%zu) is bigger than string size(%zu)\n", __FILE__, __LINE__, at, char_count);
@@ -229,22 +251,11 @@ void utf_insert(UTFString* str, size_t at, const char* to_insert) {
     utf_is_valid(str);
 }
 
-void utf_append_sv(UTFString* str, UTFStringView to_append)
+void utf_insert_str(UTFString* str, size_t at, UTFString* to_insert)
 {
-    size_t str_len = to_append.data_size;
-    size_t null_included = str_len + 1;
-
-    utf_grow(str, null_included + str->data_size);
-
-    memcpy(str->data + str->data_size, to_append.data, str_len);
-    str->data_size += str_len;
-
-    str->data[str->data_size] = 0;
-
-    str->count += to_append.count;
-
-    utf_is_valid(str);
+    utf_insert_sv(str, at, utf_sv_from_str(to_insert));
 }
+
 
 void utf_insert_sv(UTFString* str, size_t at, UTFStringView to_insert)
 {
@@ -262,9 +273,10 @@ void utf_insert_sv(UTFString* str, size_t at, UTFStringView to_insert)
     utf_grow(str, null_included + str->data_size);
 
     //last+1 > at instead of last >= at because it wraps aroud when at is 0
-    for (size_t last = str->data_size - 1; last + 1 > at; last--) {
+    /*for (size_t last = str->data_size - 1; last + 1 > at; last--) {
         str->data[last + str_len] = str->data[last];
-    }
+    }*/
+    memmove(str->data + at + to_insert.data_size, str->data + at, str->data_size - at);
 
     memcpy(str->data + at, to_insert.data, str_len);
     
@@ -282,6 +294,11 @@ void utf_erase_range(UTFString* str, size_t from, size_t to) {
         to = from;
         from = tmp;
     }
+    if (to - from >= str->count) {
+        str->data_size = 0;
+        str->count = 0;
+        return;
+    }
 
     size_t char_count = str->count;
 
@@ -293,12 +310,12 @@ void utf_erase_range(UTFString* str, size_t from, size_t to) {
     from = utf_count_to_byte(str, from);
     to = utf_count_to_byte(str, to);
 
-    size_t delete_length = to - from;
     size_t distance = to - from;
 
-    for (size_t i = from; i < str->data_size; i++) {
+    /*for (size_t i = from; i < str->data_size; i++) {
         str->data[i] = str->data[i + distance];
-    }
+    }*/
+    memmove(str->data+from, str->data + distance + from, str->data_size - from);
 
     str->data_size -= distance;
     str->data[str->data_size] = 0;
@@ -341,9 +358,10 @@ void utf_erase_left(UTFString* str, size_t how_many)
 
     how_many = utf_count_to_byte(str, how_many);
 
-    for (size_t i = how_many; i < str->data_size; i++) {
+    /*for (size_t i = how_many; i < str->data_size; i++) {
         str->data[i - how_many] = str->data[i];
-    }
+    }*/
+    memmove(str->data, str->data + how_many, str->data_size - how_many);
     str->data_size -= how_many;
     str->data[str->data_size] = 0;
 
@@ -356,16 +374,15 @@ void utf_erase_left(UTFString* str, size_t how_many)
 
 size_t utf_sv_count_to_byte(UTFStringView sv, size_t count) 
 {
-    int count_copy = count;
-    if (count_copy == 0) {
+    if (count == 0) {
         return 0;
     }
-    count_copy++;
+    count++;
     for(size_t i=0; i< sv.data_size; i++){
         if ((sv.data[i] & 0b11000000) != 0b10000000) {
-            count_copy--;
+            count--;
         }
-        if(count_copy == 0){
+        if(count == 0){
             return i;
         }
     }
