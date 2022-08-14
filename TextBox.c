@@ -345,6 +345,13 @@ void update_text_line(TextBox* box, TextLine* line)
 	while (true) {
 		size_t measured_count = 0;
 		bool fits = sv_fits(sv, box->font, box->w, &measured_count, NULL);
+
+		//this is for the special case where font is so large that
+		//it couldn't fit even a single character...
+		if (sv.count > 0 && measured_count == 0) {
+			break;
+		}
+
 		line->wrapped_line_sizes[size_offset++] = measured_count;
 		line->wrapped_line_count++;
 		line->size_y += font_height;
