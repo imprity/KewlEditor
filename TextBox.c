@@ -853,11 +853,6 @@ renderexit:
 	SDL_SetRenderDrawBlendMode(renderer,prev_blend_mode);
 }
 
-void text_box_update_selection(TextBox* box) {
-	box->selection.end_line_number = box->cursor.line_number;
-	box->selection.end_char = box->cursor.char_offset;
-}
-
 Cursor text_box_move_cursor_left(TextBox* box, Cursor cursor)
 {
 	Cursor new_cursor_pos = cursor;
@@ -873,10 +868,6 @@ Cursor text_box_move_cursor_left(TextBox* box, Cursor cursor)
 			new_cursor_pos.char_offset = prev_line->str->count;
 			new_cursor_pos.line_number--;
 		}
-	}
-
-	if (box->is_selecting) {
-		text_box_update_selection(box);
 	}
 
 	box->need_to_render = true;
@@ -900,10 +891,6 @@ Cursor text_box_move_cursor_right(TextBox* box, Cursor cursor)
 			new_cursor_pos.char_offset = 0;
 			new_cursor_pos.line_number++;
 		}
-	}
-
-	if (box->is_selecting) {
-		text_box_update_selection(box);
 	}
 
 	box->need_to_render = true;
@@ -994,10 +981,6 @@ Cursor text_box_move_cursor_down(TextBox* box, Cursor cursor)
 			0
 		);
 		new_cursor_pos.line_number++;
-	}
-
-	if (box->is_selecting) {
-		text_box_update_selection(box);
 	}
 
 	box->need_to_render = true;
@@ -1100,3 +1083,24 @@ Cursor text_box_delete_range(TextBox* box, Selection selection)
 	return new_cursor_pos;
 }
 
+void text_box_resize(TextBox* box, int w, int h)
+{
+	SDL_Texture *new_render_texture = SDL_CreateTexture(box->renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, w, h);
+
+	if (!new_render_texture) {
+		fprintf(stderr, "%s:%d:ERROR : Failed to resize text box!!! : %s", __FILE__, __LINE__, SDL_GetError());
+		return;
+	}
+	SDL_DestroyTexture(box->texture);
+	box->texture = new_render_texture;
+
+	box->w = w;
+	box->h = h;
+
+	for (TextLine* line = box->first_line; line != NULL; line = line->next) {
+		update_text_line(box, line);
+	}
+
+	box->offset_y = calculate_new_box_offset_y(box, box->cursor);
+	box->need_to_render = true;
+}

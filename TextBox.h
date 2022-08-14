@@ -100,7 +100,6 @@ Cursor text_box_move_cursor_down(TextBox* box, Cursor cursor);
 Cursor text_box_delete_a_character(TextBox* box, Cursor cursor);
 Cursor text_box_delete_range(TextBox* box, Selection selection);
 
-void text_box_start_selection(TextBox* box);
-void text_box_end_selection(TextBox* box);
+void text_box_resize(TextBox* box, int w, int h);
 
 #endif

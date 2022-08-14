@@ -46,8 +46,8 @@ int main(int argc, char* argv[])
     SDL_Window* win = SDL_CreateWindow("Kewl Editor",
         SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED,
-        //600, 600, SDL_WINDOW_RESIZABLE);
-        600, 600, 0);
+        600, 600, SDL_WINDOW_RESIZABLE);
+        //600, 600, 0);
 
     SDL_Renderer* renderer = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED);
 
@@ -122,6 +122,14 @@ int main(int argc, char* argv[])
 
         case SDL_QUIT: {
             quit = true;
+        }break;
+
+        case SDL_WINDOWEVENT: {
+            if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
+                int new_w, new_h;
+                SDL_GetWindowSize(win, &new_w, &new_h);
+                text_box_resize(box, new_w, new_h);
+            }
         }break;
 
         }
