@@ -20,6 +20,8 @@ u8"\n"                                                                          
 u8"야생 사과는 키르기스스탄과 중국 사이에 위치한 톈산 산맥과 타림 분지가 원산지로, 이후 전 세계에 퍼지게 되었다.\n"    \
 u8"참고로 다른 과일인 배와 복숭아도 같은 지역이 원산지이다.\n")
 
+#define MISSING_GLYPH "?"
+
 
 bool sv_fits(UTFStringView sv, TTF_Font* font, int w, size_t* text_count, int* text_width) {
 	if (sv.count == 0) {
@@ -110,6 +112,33 @@ void get_char_coord_from_cursor(
 	if (y) { *y = line->wrapped_line_count-1; }
 }
 
+UTFString* replace_missing_glyph_with_char(UTFString* str, TTF_Font* font, UTFStringView replacement) {
+
+	size_t bit_offset = 0;
+	size_t ptr = str->data;
+
+	UTFString* copy = utf_from_cstr("");
+
+	if (str->count == 0) {
+		return copy;
+	}
+
+	for (size_t i = 0; i < str->count; i++) {
+		size_t next = utf_next(str, bit_offset);
+		uint32_t codepoint = utf8_to_32(ptr + bit_offset, next - bit_offset);
+		if (!TTF_GlyphIsProvided32(font, codepoint)) {
+			utf_append_sv(copy, replacement);
+		}
+		else {
+			UTFStringView character = utf_sv_sub_str(str, i, i + 1);
+			utf_append_sv(copy, character);
+		}
+		bit_offset = next;
+	}
+
+	return copy;
+}
+
 void get_cursor_screen_pos(TextBox* box, int* cursor_x, int* cursor_y)
 {
 	TextLine* cursor_line = get_line_from_line_number(box, box->cursor.line_number);
@@ -146,8 +175,10 @@ void get_cursor_screen_pos(TextBox* box, int* cursor_x, int* cursor_y)
 		sv = utf_sv_trim_left(sv, cursor_line->wrapped_line_sizes[i]);
 	}
 
+	UTFString* copy = replace_missing_glyph_with_char(utf_from_sv(sv), box->font, utf_sv_from_cstr(MISSING_GLYPH));
+
 	int measured_x = 0;
-	sv_fits(sv, box->font, box->w, NULL, &measured_x);
+	sv_fits(utf_sv_from_str(copy), box->font, box->w, NULL, &measured_x);
 
 	if (cursor_x) {
 		*cursor_x = measured_x;
@@ -155,6 +186,8 @@ void get_cursor_screen_pos(TextBox* box, int* cursor_x, int* cursor_y)
 	if (cursor_y) {
 		*cursor_y = offset_y;
 	}
+
+	utf_destroy(copy);
 }
 
 int calculate_new_box_offset_y(TextBox* box, Cursor cursor) {
@@ -325,7 +358,9 @@ void text_box_handle_event(TextBox* box, SDL_Event* event)
 
 void update_text_line(TextBox* box, TextLine* line)
 {
-	UTFStringView sv = utf_sv_from_str(line->str);
+	UTFString* copy = replace_missing_glyph_with_char(line->str, box->font, utf_sv_from_cstr(MISSING_GLYPH));
+
+	UTFStringView sv = utf_sv_from_str(copy);
 	int font_height = TTF_FontHeight(box->font);
 
 	if (sv.count == 0) {
@@ -333,6 +368,7 @@ void update_text_line(TextBox* box, TextLine* line)
 		line->size_x = box->w;
 		line->wrapped_line_count = 1;
 		line->wrapped_line_sizes[0] = 0;
+		utf_destroy(copy);
 		return;
 	}
 
@@ -360,6 +396,8 @@ void update_text_line(TextBox* box, TextLine* line)
 			break;
 		}
 	}
+
+	utf_destroy(copy);
 
 }
 
@@ -682,8 +720,10 @@ void text_box_render(TextBox* box) {
 				outside_selecton = !completely_inside_selection && !partially_inside_selection;
 			}
 
+			UTFString* copy = replace_missing_glyph_with_char(line->str, box->font, utf_sv_from_cstr(MISSING_GLYPH));
+
 			if (outside_selecton || completely_inside_selection) {
-				UTFStringView sv = utf_sv_from_str(line->str);
+				UTFStringView sv = utf_sv_from_str(copy);
 
 				size_t char_offset = 0;
 
@@ -709,7 +749,7 @@ void text_box_render(TextBox* box) {
 				}
 			}
 			else {
-				UTFStringView sv = utf_sv_from_str(line->str);
+				UTFStringView sv = utf_sv_from_str(copy);
 
 				size_t char_offset = 0;
 
@@ -834,6 +874,9 @@ void text_box_render(TextBox* box) {
 					pixel_offset_y += font_height;
 				}
 			}
+
+			utf_destroy(copy);
+
 		}
 	}
 text_render_end:

@@ -1,4 +1,4 @@
-#include "UTFString.h"
+﻿#include "UTFString.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,6 +8,89 @@
 ///////////////////////
 // utf8 utills
 ///////////////////////
+
+void dump_binary(uint32_t to_dump) {
+    for (int i = 32-1; i >= 0; i--) {
+        uint32_t copy = to_dump >> i;
+        copy = copy & 1;
+        if (copy == 1) {
+            putchar('1');
+        }
+        else  {
+            putchar('0');
+        }
+    }
+    putchar('\n');
+}
+
+uint32_t utf8_to_32(char* char_array, size_t array_size)
+{
+    uint32_t to_return = 0;
+    size_t bit_offset = 0;
+    for (int i = array_size - 1; i >= 0; i--) {
+        uint32_t tmp = 0;
+        uint8_t byte = char_array[i];
+        if ((byte & 0b11000000) == 0b10000000) {
+            tmp = byte & 0b00111111;
+            tmp = tmp << bit_offset;
+            to_return = to_return | tmp;
+            bit_offset += 6;
+        }
+        else {
+            if ((byte & 0b10000000) == 0) {
+                if (array_size != 1) {
+                    fprintf(stderr, "%s:%d:ERROR: Invalid utf8\n", __FILE__, __LINE__);
+                    return 0;
+                }
+                else {
+                    return byte & 0b01111111;
+                }
+            }
+            else if ((byte & 0b11100000) == 0b11000000) {
+                if (array_size != 2) {
+                    fprintf(stderr, "%s:%d:ERROR: Invalid utf8\n", __FILE__, __LINE__);
+                    return 0;
+                }
+                else {
+                    tmp = byte & 0b00011111;
+                    tmp = tmp << bit_offset;
+                    to_return = to_return | tmp;
+                    return to_return;
+                }
+            }
+            else if ((byte & 0b11110000) == 0b11100000) {
+                if (array_size != 3) {
+                    fprintf(stderr, "%s:%d:ERROR: Invalid utf8\n", __FILE__, __LINE__);
+                    return 0;
+                }
+                else {
+                    tmp = byte & 0b00001111;
+                    tmp = tmp << bit_offset;
+                    to_return = to_return | tmp;
+                    return to_return;
+                }
+            }
+            else if ((byte & 0b11111000) == 0b11110000) {
+                if (array_size != 3) {
+                    fprintf(stderr, "%s:%d:ERROR: Invalid utf8\n", __FILE__, __LINE__);
+                    return 0;
+                }
+                else {
+                    tmp = byte & 0b00000111;
+                    tmp = tmp << bit_offset;
+                    to_return = to_return | tmp;
+                    return to_return;
+                }
+            }
+            else {
+                fprintf(stderr, "%s:%d:ERROR: Invalid utf8\n", __FILE__, __LINE__);
+                return 0;
+            }
+        }
+    }
+    
+    return 0;
+}
 
 //https://stackoverflow.com/questions/32936646/getting-the-string-length-on-utf-8-in-c#:~:text=The%20number%20of%20code%20points,and%20stopping%20at%20'%5C0'%20.
 size_t utf8_get_length(const char* str) {
@@ -800,6 +883,16 @@ bool utf_test()
         utf_erase_range(short_str, short_str->count, short_str->count);
         assert(utf_sv_cmp(utf_sv_from_str(short_str), utf_sv_from_cstr(u8"ot")));
         utf_destroy(short_str);
+    }
+    {
+        const char character1[] = u8"일";
+        assert(0xc77c == utf8_to_32(character1, sizeof(character1)-1));
+
+        const char character2[] = u8"a";
+        assert('a' == utf8_to_32(character2, sizeof(character2) - 1));
+
+        const char character3[] = u8"£";
+        assert(0b00010100011 == utf8_to_32(character3, sizeof(character3) - 1));
     }
 
 

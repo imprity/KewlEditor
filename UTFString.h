@@ -7,6 +7,9 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdint.h>
+
+uint32_t utf8_to_32(char* char_array, size_t array_size);
 
 typedef struct UTFString {
     char* data;
