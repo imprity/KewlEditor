@@ -12,16 +12,17 @@
 "And you all make funand laughter as easy as Pinkie Pie\n")
 
 #define TEST_TEXT_KOREAN (\
-u8"»ç°úÀÇ Æ¯Â¡\n"                                                                                         \
-u8"°úÀ°Àº ±âº»ÀûÀ¸·Î ³ë¶õ»ö~¿¬µÎ»öÀÌ¸ç, ¸ÀÀº Ç°Á¾¸¶´Ù ´Ù¸£´Ù.¾Æ·¡ »ç°ú Ç°Á¾ ¹®´ÜÀ» Âü°íÇÏÀÚ.\n"                     \
-u8"ÀÏ¹ÝÀûÀ¸·Î ÇÑ±¹¿¡¼­ ¸»ÇÏ´Â »ç°ú ¸ÀÀº ´ÞÄÞ»õÄÞ + ¾Æ»è¾Æ»èÇÏ°Ô ¾ÃÈ÷´Â Åº·ÂÀÌ ÀÖ°í ´Ü´ÜÇÑ °úÀ°ÀÇ ½Ä°¨À» ¸»ÇÑ´Ù.\n"     \
-u8"Á¾¸¶´Ù ´Ù¸£Áö¸¸ Àß ÀÍÀº »ç°ú´Â ²®ÁúÀÌ ¹þ°ÜÁöÁö ¾ÊÀº »óÅÂ¿¡¼­µµ Ã»·®°¨ÀÌ ÀÖ´Â ÁÁÀº ³¿»õ°¡ ³­´Ù.\n"                 \
+u8"ì‚¬ê³¼ì˜ íŠ¹ì§•\n"                                                                                         \
+u8"ê³¼ìœ¡ì€ ê¸°ë³¸ì ìœ¼ë¡œ ë…¸ëž€ìƒ‰~ì—°ë‘ìƒ‰ì´ë©°, ë§›ì€ í’ˆì¢…ë§ˆë‹¤ ë‹¤ë¥´ë‹¤.ì•„ëž˜ ì‚¬ê³¼ í’ˆì¢… ë¬¸ë‹¨ì„ ì°¸ê³ í•˜ìž.\n"                     \
+u8"ì¼ë°˜ì ìœ¼ë¡œ í•œêµ­ì—ì„œ ë§í•˜ëŠ” ì‚¬ê³¼ ë§›ì€ ë‹¬ì½¤ìƒˆì½¤ + ì•„ì‚­ì•„ì‚­í•˜ê²Œ ì”¹ížˆëŠ” íƒ„ë ¥ì´ ìžˆê³  ë‹¨ë‹¨í•œ ê³¼ìœ¡ì˜ ì‹ê°ì„ ë§í•œë‹¤.\n"     \
+u8"ì¢…ë§ˆë‹¤ ë‹¤ë¥´ì§€ë§Œ ìž˜ ìµì€ ì‚¬ê³¼ëŠ” ê»ì§ˆì´ ë²—ê²¨ì§€ì§€ ì•Šì€ ìƒíƒœì—ì„œë„ ì²­ëŸ‰ê°ì´ ìžˆëŠ” ì¢‹ì€ ëƒ„ìƒˆê°€ ë‚œë‹¤.\n"                 \
 u8"\n"                                                                                                   \
-u8"¾ß»ý »ç°ú´Â Å°¸£±â½º½ºÅº°ú Áß±¹ »çÀÌ¿¡ À§Ä¡ÇÑ Åã»ê »ê¸Æ°ú Å¸¸² ºÐÁö°¡ ¿ø»êÁö·Î, ÀÌÈÄ Àü ¼¼°è¿¡ ÆÛÁö°Ô µÇ¾ú´Ù.\n"    \
-u8"Âü°í·Î ´Ù¸¥ °úÀÏÀÎ ¹è¿Í º¹¼þ¾Æµµ °°Àº Áö¿ªÀÌ ¿ø»êÁöÀÌ´Ù.\n")
+u8"ì•¼ìƒ ì‚¬ê³¼ëŠ” í‚¤ë¥´ê¸°ìŠ¤ìŠ¤íƒ„ê³¼ ì¤‘êµ­ ì‚¬ì´ì— ìœ„ì¹˜í•œ í†ˆì‚° ì‚°ë§¥ê³¼ íƒ€ë¦¼ ë¶„ì§€ê°€ ì›ì‚°ì§€ë¡œ, ì´í›„ ì „ ì„¸ê³„ì— í¼ì§€ê²Œ ë˜ì—ˆë‹¤.\n"    \
+u8"ì°¸ê³ ë¡œ ë‹¤ë¥¸ ê³¼ì¼ì¸ ë°°ì™€ ë³µìˆ­ì•„ë„ ê°™ì€ ì§€ì—­ì´ ì›ì‚°ì§€ì´ë‹¤.\n")
 
 #define MISSING_GLYPH "?"
 
+#define min(a, b) ((a) > (b) ?  b : a)
 
 bool sv_fits(UTFStringView sv, TTF_Font* font, int w, size_t* text_count, int* text_width) {
 	if (sv.count == 0) {
@@ -70,7 +71,7 @@ TextLine* get_cursor_line(TextBox* box) {
 
 void get_char_coord_from_cursor(
 	TextBox* box, Cursor cursor, size_t* x, size_t* y
-) 
+)
 {
 	if (cursor.char_offset == 0) {
 		if (x) {*x = 0;}
@@ -286,7 +287,7 @@ void text_box_handle_event(TextBox* box, SDL_Event* event)
 				box->is_selecting = false;
 				box->need_to_render = true;
 			}
-			
+
 			box->offset_y = calculate_new_box_offset_y(box, box->cursor);
 		}break;
 		case SDL_SCANCODE_RIGHT: {
@@ -636,7 +637,7 @@ bool draw_sv(
 Selection normalize_selection(Selection selection)
 {
 	Selection to_return = selection;
-	
+
 	if (selection.start_line_number == selection.end_line_number) {
 		if (selection.start_char > selection.end_char) {
 			to_return.end_char = selection.start_char;
@@ -733,14 +734,14 @@ void text_box_render(TextBox* box) {
 					}
 					size_t line_start = char_offset;
 					size_t line_end = line->wrapped_line_sizes[i] + char_offset;
-						
+
 					UTFStringView line_sv = utf_sv_sub_sv(sv, line_start, line_end);
 					if (
 						!draw_sv(box, line_sv, 0, pixel_offset_y,
 							completely_inside_selection && box->is_selecting,
 							box->text_color, box->selection_fg, box->selection_bg,
 							NULL, NULL
-						)) 
+						))
 					{
 						goto renderexit;
 					}
@@ -759,7 +760,7 @@ void text_box_render(TextBox* box) {
 					}
 					size_t line_start = char_offset;
 					size_t line_end = line->wrapped_line_sizes[i] + char_offset;
-						
+
 					UTFStringView line_sv = utf_sv_sub_sv(sv, line_start, line_end);
 
 					bool left_shaded = selection.end_char <= line_end && selection.end_char >= line_start;
@@ -784,7 +785,7 @@ void text_box_render(TextBox* box) {
 								false,
 								box->text_color, box->selection_fg, box->selection_bg,
 								&rendered_size_x, NULL
-							)) 
+							))
 						{
 							goto renderexit;
 						}
@@ -794,7 +795,7 @@ void text_box_render(TextBox* box) {
 								true,
 								box->text_color, box->selection_fg, box->selection_bg,
 								&rendered_size_x, NULL
-							)) 
+							))
 						{
 							goto renderexit;
 						}
@@ -804,7 +805,7 @@ void text_box_render(TextBox* box) {
 								false,
 								box->text_color, box->selection_fg, box->selection_bg,
 								NULL, NULL
-							)) 
+							))
 						{
 							goto renderexit;
 						}
@@ -819,7 +820,7 @@ void text_box_render(TextBox* box) {
 								true,
 								box->text_color, box->selection_fg, box->selection_bg,
 								&rendered_size_x, NULL
-							)) 
+							))
 						{
 							goto renderexit;
 						}
@@ -829,7 +830,7 @@ void text_box_render(TextBox* box) {
 								false,
 								box->text_color, box->selection_fg, box->selection_bg,
 								NULL, NULL
-							)) 
+							))
 						{
 							goto renderexit;
 						}
@@ -844,7 +845,7 @@ void text_box_render(TextBox* box) {
 								false,
 								box->text_color, box->selection_fg, box->selection_bg,
 								&rendered_size_x, NULL
-							)) 
+							))
 						{
 							goto renderexit;
 						}
@@ -854,7 +855,7 @@ void text_box_render(TextBox* box) {
 								true,
 								box->text_color, box->selection_fg, box->selection_bg,
 								NULL, NULL
-							)) 
+							))
 						{
 							goto renderexit;
 						}
@@ -879,7 +880,7 @@ void text_box_render(TextBox* box) {
 
 		}
 	}
-text_render_end:
+text_render_end: ;
 
 	/////////////////////////////
 	// Render Cursor
@@ -998,7 +999,7 @@ Cursor text_box_move_cursor_up(TextBox* box, Cursor cursor)
 	}
 
 	box->need_to_render = true;
-	
+
 	return new_cursor_pos;
 }
 
@@ -1017,7 +1018,7 @@ Cursor text_box_move_cursor_down(TextBox* box, Cursor cursor)
 	}
 
 	if (offset_y + 1 < cursor_line->wrapped_line_count) {
-		
+
 		new_cursor_pos.char_offset = get_char_offset_from_line_and_char_coord(
 			cursor_line,
 			offset_x,
@@ -1106,7 +1107,7 @@ Cursor text_box_delete_range(TextBox* box, Selection selection)
 
 		//erase start_str after selection start char
 		utf_erase_range(start_str, selection.start_char, start_str->count);
-		//append after_selection_end_char 
+		//append after_selection_end_char
 		utf_append_sv(start_str, after_selection_end_char);
 
 		//free lines between start and end

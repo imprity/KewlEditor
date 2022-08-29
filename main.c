@@ -14,15 +14,13 @@
 #include "UTFString.h"
 #include "TextBox.h"
 #include "TextLine.h"
-#include <Windows.h>
 
 
 int main(int argc, char* argv[])
 {
-    SetConsoleOutputCP(65001);
-
     text_line_test();
     utf_test();
+
     bool init_success = true;
     ////////////////////////////////
     // init sdl
@@ -33,15 +31,16 @@ int main(int argc, char* argv[])
         init_success = false;
     }
 
+    /*
     if (!SDL_SetHint(SDL_HINT_IME_SHOW_UI, "1")) {
         printf("ERROR: Failed to set SDL_HINT_IME_SHOW_UI\n");
         init_success = false;
-    }
+    }*/
     if (!SDL_SetHint(SDL_HINT_IME_INTERNAL_EDITING, "1")) {
         printf("ERROR: Failed to set SDL_HINT_IME_INTERNAL_EDITING\n");
         init_success = false;
     }
-    
+
 
     SDL_Window* win = SDL_CreateWindow("Kewl Editor",
         SDL_WINDOWPOS_CENTERED,
@@ -80,7 +79,7 @@ int main(int argc, char* argv[])
         u8"\n"
         u8"\n"
         u8"\n"
-        u8"LOOOOOOOOOOOOOOOONG~~~~~~\n", 
+        u8"LOOOOOOOOOOOOOOOONG~~~~~~\n",
         WIDTH, HEIGHT, font, renderer);*/
 
     SDL_Color bg_color = { .r = 30, .g = 30, .b = 30, .a = 255 };
@@ -89,14 +88,14 @@ int main(int argc, char* argv[])
     SDL_Color text_color = { .r = 240, .g = 240, .b = 240, .a = 255 };
     SDL_Color cursor_color = { .r = 240, .g = 240, .b = 240, .a = 255 };
 
-    TextBox* box = text_box_create("", WIDTH, HEIGHT, font, 
-        bg_color, text_color, selection_bg, selection_fg, cursor_color, 
+    TextBox* box = text_box_create("", WIDTH, HEIGHT, font,
+        bg_color, text_color, selection_bg, selection_fg, cursor_color,
         renderer);
 
     ////////////////////////////////
     // event loop
     ////////////////////////////////
-    
+
     SDL_Rect rect = { .x = 0,.y = 0,.w = WIDTH, .h = HEIGHT };
     SDL_SetTextInputRect(&rect);
     SDL_StartTextInput();
@@ -113,7 +112,7 @@ int main(int argc, char* argv[])
     while  (!quit) {
 
         SDL_WaitEvent(&event);
-        uint64_t start_time = SDL_GetTicks64();
+        uint32_t start_time = SDL_GetTicks();
 
         //while (SDL_PollEvent(&event)) {
         text_box_handle_event(box, &event);
@@ -140,13 +139,13 @@ int main(int argc, char* argv[])
 
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
         SDL_RenderCopy(renderer, box->texture, NULL, NULL);
-        
+
         SDL_RenderPresent(renderer);
-        
-        uint64_t end_time = (SDL_GetTicks64() - start_time);
+
+        uint32_t end_time = (SDL_GetTicks() - start_time);
         double fps = end_time == 0 ? 0 : 1000.0 / (double)(end_time);
         static char tmp_buffer[1024];
-        sprintf_s(tmp_buffer, 1023, "Kewl Editor  FPS : %5.2lf", fps);
+        sprintf(tmp_buffer, "Kewl Editor  FPS : %5.2lf", fps);
         SDL_SetWindowTitle(win, tmp_buffer);
     }
 
