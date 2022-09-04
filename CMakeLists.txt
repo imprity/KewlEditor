@@ -12,6 +12,8 @@ set(SRCS
 	"${SRC_DIR}/TextLine.h"
 	"${SRC_DIR}/OS.c" 
 	"${SRC_DIR}/OS.h"
+	"${SRC_DIR}/linux/LinuxMain.c"
+	"${SRC_DIR}/linux/LinuxMain.h"
 	"${CMAKE_CURRENT_SOURCE_DIR}/UTF8String/UTFString.c" 
 	"${CMAKE_CURRENT_SOURCE_DIR}/UTF8String/UTFString.h"
 	)

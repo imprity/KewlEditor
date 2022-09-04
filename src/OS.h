@@ -5,12 +5,16 @@
 #include <stdbool.h>
 #include <UTFString.h>
 
+//////////////////////////
+//Event Stuffs
+//////////////////////////
+
 typedef enum
 {
-    OS_QUIT,
-    OS_RESIZE,
-    OS_KEY_PRESS,
-    OS_KEY_RELEASE,
+    OS_QUIT_EVENT,
+    OS_RESIZE_EVENT,
+    OS_KEY_PRESS_EVENT,
+    OS_KEY_RELEASE_EVENT,
     OS_TEXT_INPUT_EVENT,
 }OS_EventType;
 
@@ -88,6 +92,31 @@ typedef enum
     OS_KEY_y = 'y',
     OS_KEY_z = 'z',
 
+    OS_KEY_F1,
+    OS_KEY_F2,
+    OS_KEY_F3,
+    OS_KEY_F4,
+    OS_KEY_F5,
+    OS_KEY_F6,
+    OS_KEY_F7,
+    OS_KEY_F8,
+    OS_KEY_F9,
+    OS_KEY_F10,
+    OS_KEY_F11,
+    OS_KEY_F12,
+    OS_KEY_F13,
+    OS_KEY_F14,
+    OS_KEY_F15,
+    OS_KEY_F16,
+    OS_KEY_F17,
+    OS_KEY_F18,
+    OS_KEY_F19,
+    OS_KEY_F20,
+    OS_KEY_F21,
+    OS_KEY_F22,
+    OS_KEY_F23,
+
+
     OS_KEY_LEFT,
     OS_KEY_RIGHT,
     OS_KEY_UP,
@@ -123,5 +152,17 @@ typedef struct
     OS_ResizeEvent resize_event;
     OS_EventType type;
 } OS_Event;
+
+//////////////////////////
+//OS Stuff
+//////////////////////////
+
+typedef struct OS OS;
+
+extern OS *GLOBAL_OS;
+
+void os_set_ime_preedit_pos(int x, int y);
+OS_Keymod os_get_mod_state();
+
 
 #endif

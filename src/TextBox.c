@@ -233,39 +233,120 @@ bool has_selection(TextBox* box, Selection selection)
 
 void text_box_handle_event(TextBox* box, OS_Event* event)
 {
+	OS_Keymod key_mode =  os_get_mod_state();
+
+	bool holding_shift = key_mode & OS_KMOD_SHIFT;
+
+	//if holding shift and text box is not selecting
+	//then begin selection
+	if (holding_shift && !box->is_selecting) {
+		box->selection = set_selection_to_cursor(box->cursor);
+		box->is_selecting = true;
+	}
+
+	bool have_selection = has_selection(box,box->selection);
+
 	switch (event->type) {
         case OS_TEXT_INPUT_EVENT: {
-            //TODO : this is technically incorrect since sv data can be not nul terminated
+            if (have_selection) {
+                box->cursor = text_box_delete_range(box, box->selection);
+            }
             box->cursor = text_box_type(box, box->cursor, event->text_input_event.text_sv.data);
             box->selection = set_selection_to_cursor(box->cursor);
+            if (!holding_shift) {
+                box->is_selecting = false;
+            }
             box->offset_y = calculate_new_box_offset_y(box, box->cursor);
         }break;
 
-        case OS_KEY_PRESS: {
-            switch (event->keyboard_event.key_sym) {
+        case OS_KEY_PRESS_EVENT: {
+            OS_KeySym key = event->keyboard_event.key_sym;
+            switch (key) {
                 case OS_KEY_ENTER: {
+                    if (have_selection) {
+                        box->cursor = text_box_delete_range(box, box->selection);
+                    }
                     box->cursor = text_box_type(box, box->cursor, "\n");
                     box->selection = set_selection_to_cursor(box->cursor);
+                    if (!holding_shift) {
+                        box->is_selecting = false;
+                    }
                     box->offset_y = calculate_new_box_offset_y(box, box->cursor);
                 }break;
                 case OS_KEY_LEFT: {
-                    box->cursor = text_box_move_cursor_left(box, box->cursor);
+                    if (holding_shift) {
+                        box->cursor = text_box_move_cursor_left(box, box->cursor);
+                        box->selection = set_selection_end(box->selection, box->cursor);
+                    }
+                    else {
+                        if (!have_selection) {
+                            box->cursor = text_box_move_cursor_left(box, box->cursor);
+                        }
+                        box->is_selecting = false;
+                        box->need_to_render = true;
+                    }
+
                     box->offset_y = calculate_new_box_offset_y(box, box->cursor);
                 }break;
                 case OS_KEY_RIGHT: {
-                    box->cursor = text_box_move_cursor_right(box, box->cursor);
+                    if (holding_shift) {
+                        box->cursor = text_box_move_cursor_right(box, box->cursor);
+                        box->selection = set_selection_end(box->selection, box->cursor);
+                    }
+                    else {
+                        if (!have_selection) {
+                            box->cursor = text_box_move_cursor_right(box, box->cursor);
+                        }
+                        box->is_selecting = false;
+                        box->need_to_render = true;
+                    }
+
                     box->offset_y = calculate_new_box_offset_y(box, box->cursor);
                 }break;
                 case OS_KEY_UP: {
                     box->cursor = text_box_move_cursor_up(box, box->cursor);
+                    if (holding_shift) {
+                        box->selection = set_selection_end(box->selection, box->cursor);
+                    }
+                    else {
+                        box->is_selecting = false;
+                    }
+
                     box->offset_y = calculate_new_box_offset_y(box, box->cursor);
                 }break;
                 case OS_KEY_DOWN: {
                     box->cursor = text_box_move_cursor_down(box, box->cursor);
+                    if (holding_shift) {
+                        box->selection = set_selection_end(box->selection, box->cursor);
+                    }
+                    else {
+                        box->is_selecting = false;
+                    }
+
                     box->offset_y = calculate_new_box_offset_y(box, box->cursor);
                 }break;
                 case OS_KEY_BACKSPACE: {
-                    box->cursor = text_box_delete_a_character(box, box->cursor);
+                    if (have_selection) {
+                        box->cursor = text_box_delete_range(box, box->selection);
+                    }
+                    else{
+                        box->cursor = text_box_delete_a_character(box, box->cursor);
+                    }
+                    if (holding_shift) {
+                        box->selection = set_selection_to_cursor(box->cursor);
+                    }
+                    else {
+                        box->is_selecting = false;
+                    }
+                    box->offset_y = calculate_new_box_offset_y(box, box->cursor);
+                }break;
+
+                case OS_KEY_F1: {
+                    box->cursor = text_box_type(box, box->cursor, TEST_TEXT_ENGLISH);
+                    box->offset_y = calculate_new_box_offset_y(box, box->cursor);
+                }break;
+                case OS_KEY_F2: {
+                    box->cursor = text_box_type(box, box->cursor, TEST_TEXT_KOREAN);
                     box->offset_y = calculate_new_box_offset_y(box, box->cursor);
                 }break;
             }
