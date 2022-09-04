@@ -5,41 +5,40 @@
 #include "TextLine.h"
 #include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL.h>
+#include "OSEvent.h"
 
 
-typedef struct Cursor {
+typedef struct TextCursor {
     size_t line_number;
     size_t char_offset;
 
-    /// <summary>
-    /// This is for the special case when cursor has to be
-    /// at the end of the line wrapped character
-    /// 
-    /// For most cases, if cursor is at the end of the wrapped line
-    /// cursor should move to the start of the next line
-    /// 
-    /// but consider this case
-    /// 
-    /// text box is like this
-    /// 
-    /// |abcde |
-    /// |abcdeI|
-    /// 
-    /// if user moves the cursor up
-    /// 
-    /// |abcdeI|
-    /// |abcde |
-    /// 
-    /// then by the above rule cursor will move to the beginning of the next line
-    /// 
-    /// | abcde|
-    /// |Iabcde|
-    /// 
-    /// we don't want that to happen so below value is there to
-    /// handle these specific cases
-    /// </summary>
+    // This is for the special case when cursor has to be
+    // at the end of the line wrapped character
+    //
+    // For most cases, if cursor is at the end of the wrapped line
+    // cursor should move to the start of the next line
+    //
+    // but consider this case
+    //
+    // text box is like this
+    //
+    // |abcde |
+    // |abcdeI|
+    //
+    // if user moves the cursor up
+    //
+    // |abcdeI|
+    // |abcde |
+    //
+    // then by the above rule cursor will move to the beginning of the next line
+    //
+    // | abcde|
+    // |Iabcde|
+    //
+    // we don't want that to happen so below value is there to
+    // handle these specific cases
     bool place_after_last_char_before_wrapping;
-} Cursor;
+} TextCursor ;
 
 typedef struct Selection {
     size_t start_line_number;
@@ -49,18 +48,19 @@ typedef struct Selection {
     size_t end_char;
 } Selection;
 
+typedef void (*PreeditPosSetter)(int x, int y);
+
 typedef struct TextBox{
     int w;
     int h;
 
     TextLine* first_line;
 
-    Cursor cursor;
+    TextCursor cursor;
 
     TTF_Font* font;
-    SDL_Texture* texture;
+    SDL_Surface* render_surface;
 
-    SDL_Renderer* renderer;
     int offset_y;
 
     Selection selection;
@@ -73,32 +73,35 @@ typedef struct TextBox{
     SDL_Color cursor_color;
 
     bool need_to_render;
+
+    UTFString* composite_str;
+
+    PreeditPosSetter preedit_pos_setter;
 }TextBox;
 
-
-
 TextBox* text_box_create(
-    const char* text, 
-    size_t w, size_t h, 
-    TTF_Font* font, 
+    const char* text,
+    size_t w, size_t h,
+    TTF_Font* font,
     SDL_Color bg_color, SDL_Color text_color, SDL_Color selection_bg, SDL_Color selection_fg, SDL_Color cursor_color,
-    SDL_Renderer* renderer);
+    PreeditPosSetter pos_setter
+    );
 
 void text_box_destroy(TextBox* box);
 
-void text_box_handle_event(TextBox* box, SDL_Event* event);
+void text_box_handle_event(TextBox* box, OS_Event* event);
 
-Cursor text_box_type(TextBox* box, Cursor cursor, char* c);
+TextCursor text_box_type(TextBox* box, TextCursor cursor, char* c);
 
 void text_box_render(TextBox* box);
 
-Cursor text_box_move_cursor_left(TextBox* box, Cursor cursor);
-Cursor text_box_move_cursor_right(TextBox* box, Cursor cursor);
-Cursor text_box_move_cursor_up(TextBox* box, Cursor cursor);
-Cursor text_box_move_cursor_down(TextBox* box, Cursor cursor);
+TextCursor text_box_move_cursor_left(TextBox* box, TextCursor cursor);
+TextCursor text_box_move_cursor_right(TextBox* box, TextCursor cursor);
+TextCursor text_box_move_cursor_up(TextBox* box, TextCursor cursor);
+TextCursor text_box_move_cursor_down(TextBox* box, TextCursor cursor);
 
-Cursor text_box_delete_a_character(TextBox* box, Cursor cursor);
-Cursor text_box_delete_range(TextBox* box, Selection selection);
+TextCursor text_box_delete_a_character(TextBox* box, TextCursor cursor);
+TextCursor text_box_delete_range(TextBox* box, Selection selection);
 
 void text_box_resize(TextBox* box, int w, int h);
 

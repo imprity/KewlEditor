@@ -70,7 +70,7 @@ TextLine* get_cursor_line(TextBox* box) {
 }
 
 void get_char_coord_from_cursor(
-	TextBox* box, Cursor cursor, size_t* x, size_t* y
+	TextBox* box, TextCursor cursor, size_t* x, size_t* y
 )
 {
 	if (cursor.char_offset == 0) {
@@ -191,7 +191,7 @@ void get_cursor_screen_pos(TextBox* box, int* cursor_x, int* cursor_y)
 	utf_destroy(copy);
 }
 
-int calculate_new_box_offset_y(TextBox* box, Cursor cursor) {
+int calculate_new_box_offset_y(TextBox* box, TextCursor cursor) {
 	int font_height = TTF_FontHeight(box->font);
 
 	int offset_y = box->offset_y;
@@ -209,7 +209,7 @@ int calculate_new_box_offset_y(TextBox* box, Cursor cursor) {
 	return offset_y;
 }
 
-Selection set_selection_to_cursor(Cursor cursor) {
+Selection set_selection_to_cursor(TextCursor cursor) {
 	Selection selection = {
 		.start_char = cursor.char_offset, .start_line_number = cursor.line_number,
 		.end_char = cursor.char_offset, .end_line_number = cursor.line_number,
@@ -217,7 +217,7 @@ Selection set_selection_to_cursor(Cursor cursor) {
 	return selection;
 }
 
-Selection set_selection_end(Selection selection, Cursor cursor) {
+Selection set_selection_end(Selection selection, TextCursor cursor) {
 	selection.end_char = cursor.char_offset;
 	selection.end_line_number = cursor.line_number;
 	return selection;
@@ -231,129 +231,45 @@ bool has_selection(TextBox* box, Selection selection)
 	return !no_selection;
 }
 
-void text_box_handle_event(TextBox* box, SDL_Event* event)
+void text_box_handle_event(TextBox* box, OS_Event* event)
 {
-	SDL_Keymod key_mode =  SDL_GetModState();
-
-	bool holding_shift = key_mode & KMOD_SHIFT;
-
-	//if holding shift and text box is not selecting
-	//then begin selection
-	if (holding_shift && !box->is_selecting) {
-		box->selection = set_selection_to_cursor(box->cursor);
-		box->is_selecting = true;
-	}
-
-	bool have_selection = has_selection(box,box->selection);
-
 	switch (event->type) {
+        case OS_TEXT_INPUT_EVENT: {
+            //TODO : this is technically incorrect since sv data can be not nul terminated
+            box->cursor = text_box_type(box, box->cursor, event->text_input_event.text_sv.data);
+            box->selection = set_selection_to_cursor(box->cursor);
+            box->offset_y = calculate_new_box_offset_y(box, box->cursor);
+        }break;
 
-	case SDL_TEXTINPUT: {
-		if (have_selection) {
-			box->cursor = text_box_delete_range(box, box->selection);
-		}
-		box->cursor = text_box_type(box, box->cursor, event->text.text);
-		box->selection = set_selection_to_cursor(box->cursor);
-		if (!holding_shift) {
-			box->is_selecting = false;
-		}
-		box->offset_y = calculate_new_box_offset_y(box, box->cursor);
-	}break;
-
-	case SDL_KEYDOWN: {
-		SDL_Keysym key = event->key.keysym;
-		switch (key.scancode) {
-
-		case SDL_SCANCODE_RETURN: {
-			if (have_selection) {
-				box->cursor = text_box_delete_range(box, box->selection);
-			}
-			box->cursor = text_box_type(box, box->cursor, "\n");
-			box->selection = set_selection_to_cursor(box->cursor);
-			if (!holding_shift) {
-				box->is_selecting = false;
-			}
-			box->offset_y = calculate_new_box_offset_y(box, box->cursor);
-		}break;
-		case SDL_SCANCODE_LEFT: {
-			if (holding_shift) {
-				box->cursor = text_box_move_cursor_left(box, box->cursor);
-				box->selection = set_selection_end(box->selection, box->cursor);
-			}
-			else {
-				if (!have_selection) {
-					box->cursor = text_box_move_cursor_left(box, box->cursor);
-				}
-				box->is_selecting = false;
-				box->need_to_render = true;
-			}
-
-			box->offset_y = calculate_new_box_offset_y(box, box->cursor);
-		}break;
-		case SDL_SCANCODE_RIGHT: {
-			if (holding_shift) {
-				box->cursor = text_box_move_cursor_right(box, box->cursor);
-				box->selection = set_selection_end(box->selection, box->cursor);
-			}
-			else {
-				if (!have_selection) {
-					box->cursor = text_box_move_cursor_right(box, box->cursor);
-				}
-				box->is_selecting = false;
-				box->need_to_render = true;
-			}
-
-			box->offset_y = calculate_new_box_offset_y(box, box->cursor);
-		}break;
-		case SDL_SCANCODE_UP: {
-			box->cursor = text_box_move_cursor_up(box, box->cursor);
-			if (holding_shift) {
-				box->selection = set_selection_end(box->selection, box->cursor);
-			}
-			else {
-				box->is_selecting = false;
-			}
-
-			box->offset_y = calculate_new_box_offset_y(box, box->cursor);
-		}break;
-		case SDL_SCANCODE_DOWN: {
-			box->cursor = text_box_move_cursor_down(box, box->cursor);
-			if (holding_shift) {
-				box->selection = set_selection_end(box->selection, box->cursor);
-			}
-			else {
-				box->is_selecting = false;
-			}
-
-			box->offset_y = calculate_new_box_offset_y(box, box->cursor);
-		}break;
-		case SDL_SCANCODE_BACKSPACE: {
-			if (have_selection) {
-				box->cursor = text_box_delete_range(box, box->selection);
-			}
-			else{
-				box->cursor = text_box_delete_a_character(box, box->cursor);
-			}
-			if (holding_shift) {
-				box->selection = set_selection_to_cursor(box->cursor);
-			}
-			else {
-				box->is_selecting = false;
-			}
-			box->offset_y = calculate_new_box_offset_y(box, box->cursor);
-		}break;
-		case SDL_SCANCODE_F1: {
-			box->cursor = text_box_type(box, box->cursor, TEST_TEXT_ENGLISH);
-			box->offset_y = calculate_new_box_offset_y(box, box->cursor);
-		}break;
-		case SDL_SCANCODE_F2: {
-			box->cursor = text_box_type(box, box->cursor, TEST_TEXT_KOREAN);
-			box->offset_y = calculate_new_box_offset_y(box, box->cursor);
-		}break;
-
-		}
-	}break;
-
+        case OS_KEY_PRESS: {
+            switch (event->keyboard_event.key_sym) {
+                case OS_KEY_ENTER: {
+                    box->cursor = text_box_type(box, box->cursor, "\n");
+                    box->selection = set_selection_to_cursor(box->cursor);
+                    box->offset_y = calculate_new_box_offset_y(box, box->cursor);
+                }break;
+                case OS_KEY_LEFT: {
+                    box->cursor = text_box_move_cursor_left(box, box->cursor);
+                    box->offset_y = calculate_new_box_offset_y(box, box->cursor);
+                }break;
+                case OS_KEY_RIGHT: {
+                    box->cursor = text_box_move_cursor_right(box, box->cursor);
+                    box->offset_y = calculate_new_box_offset_y(box, box->cursor);
+                }break;
+                case OS_KEY_UP: {
+                    box->cursor = text_box_move_cursor_up(box, box->cursor);
+                    box->offset_y = calculate_new_box_offset_y(box, box->cursor);
+                }break;
+                case OS_KEY_DOWN: {
+                    box->cursor = text_box_move_cursor_down(box, box->cursor);
+                    box->offset_y = calculate_new_box_offset_y(box, box->cursor);
+                }break;
+                case OS_KEY_BACKSPACE: {
+                    box->cursor = text_box_delete_a_character(box, box->cursor);
+                    box->offset_y = calculate_new_box_offset_y(box, box->cursor);
+                }break;
+            }
+        }break;
 	}
 }
 
@@ -407,7 +323,8 @@ TextBox* text_box_create(
 	size_t w, size_t h,
 	TTF_Font* font,
 	SDL_Color bg_color, SDL_Color text_color, SDL_Color selection_bg, SDL_Color selection_fg, SDL_Color cursor_color,
-	SDL_Renderer* renderer)
+	PreeditPosSetter pos_setter
+	)
 {
 	TextBox* box = malloc(sizeof(TextBox));
 	box->w = w;
@@ -417,19 +334,15 @@ TextBox* text_box_create(
 
 	box->offset_y = 0;
 
-	box->renderer = renderer;
-
 	box->cursor.char_offset = 0;
 	box->cursor.line_number = 0;
 	box->cursor.place_after_last_char_before_wrapping = false;
 
-	box->texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, w, h);
-	if (box->texture == NULL) {
-		fprintf(stderr, "%s:%d:ERROR : Failed to create a texture for text box\n", __FILE__, __LINE__);
+	box->render_surface = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32, SDL_PIXELFORMAT_RGBA32);
+	if (box->render_surface == NULL) {
+		fprintf(stderr, "%s:%d:ERROR : Failed to create a render_surface for text box\n", __FILE__, __LINE__);
 		return NULL;
 	}
-
-	SDL_SetTextureBlendMode(box->texture, SDL_BLENDMODE_BLEND);
 
 	box->first_line = create_lines_from_cstr(text);
 
@@ -454,6 +367,10 @@ TextBox* text_box_create(
 
 	box->need_to_render = true;
 
+	box->composite_str = utf_from_cstr(u8"");
+
+	box->preedit_pos_setter = pos_setter;
+
 	return box;
 }
 
@@ -469,13 +386,13 @@ void text_box_destroy(TextBox* box)
 		line = tmp_next;
 	}
 
-	if (box->texture)
-		SDL_DestroyTexture(box->texture);
+	if (box->render_surface)
+		SDL_FreeSurface(box->render_surface);
 
 	free(box);
 }
 
-Cursor text_box_type(TextBox* box, Cursor cursor, char* c)
+TextCursor text_box_type(TextBox* box, TextCursor cursor, char* c)
 {
 	UTFStringView sv = utf_sv_from_cstr(c);
 	int new_line_index = utf_sv_find(sv, utf_sv_from_cstr(u8"\n"));
@@ -483,7 +400,7 @@ Cursor text_box_type(TextBox* box, Cursor cursor, char* c)
 
 	TextLine* cursor_line = get_cursor_line(box);
 
-	Cursor new_cursor_pos = cursor;
+	TextCursor new_cursor_pos = cursor;
 
 	if (has_new_line) {
 		//divide typed lines to before new line and after new line
@@ -609,17 +526,10 @@ bool draw_sv(
 		return false;
 	}
 
-	SDL_Texture* texture = SDL_CreateTextureFromSurface(box->renderer, surface);
-	if (!texture) {
-		fprintf(stderr, "%s:%d:ERROR : Failed to create a texture for text box\n", __FILE__, __LINE__);
-		fprintf(stderr, "%s\n", SDL_GetError());
-		SDL_FreeSurface(surface);
-		return false;
-	}
-
 	SDL_Rect line_rect = { .x = pos_x, .y = pos_y, .w = surface->w, .h = surface->h };
 
-	SDL_RenderCopy(box->renderer, texture, NULL, &line_rect);
+	//SDL_RenderCopy(box->renderer, texture, NULL, &line_rect);
+	SDL_BlitSurface(surface, NULL, box->render_surface, &line_rect);
 
 	if (rendered_size_x) {
 		*rendered_size_x = surface->w;
@@ -629,7 +539,6 @@ bool draw_sv(
 	}
 
 	SDL_FreeSurface(surface);
-	SDL_DestroyTexture(texture);
 
 	return true;
 }
@@ -662,22 +571,11 @@ void text_box_render(TextBox* box) {
 	if (!box->need_to_render) {
 		return;
 	}
-	/////////////////////////////
-	// Set Render Target
-	/////////////////////////////
-	SDL_Renderer* renderer = box->renderer;
-
-	SDL_Texture* prev_render_target = SDL_GetRenderTarget(box->renderer);
-	SDL_BlendMode prev_blend_mode = 0;
-	SDL_GetRenderDrawBlendMode(renderer, &prev_blend_mode);
-
-	SDL_SetRenderTarget(box->renderer, box->texture);
-	SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-	SDL_SetRenderDrawColor(renderer, box->bg_color.r, box->bg_color.g, box->bg_color.b, box->bg_color.a);
-	SDL_RenderClear(renderer);
+	//Clear render surface with bg color
+    SDL_FillRect(box->render_surface, NULL,
+        SDL_MapRGBA(box->render_surface->format, box->bg_color.r, box->bg_color.g, box->bg_color.b, box->bg_color.a));
 
 	int font_height = TTF_FontHeight(box->font);
-
 
 	bool no_selection = !box->is_selecting;
 	no_selection = no_selection ||
@@ -891,22 +789,17 @@ text_render_end: ;
 	get_cursor_screen_pos(box, &cursor_x, &cursor_y);
 	SDL_Rect cursor_rect = { .x = cursor_x, .y = cursor_y + 2 + box->offset_y, .w = 2, .h = font_height - 2 };
 
-	SDL_SetRenderDrawColor(box->renderer, box->cursor_color.r, box->cursor_color.g, box->cursor_color.b, box->cursor_color.a);
-	SDL_RenderFillRect(box->renderer, &cursor_rect);
+	SDL_FillRect(box->render_surface, &cursor_rect,
+        SDL_MapRGBA(box->render_surface->format, box->cursor_color.r, box->cursor_color.g, box->cursor_color.b, box->cursor_color.a));
 
 renderexit:
 
 	box->need_to_render = false;
-
-	//restore render target
-	SDL_SetRenderTarget(renderer, prev_render_target);
-	//restore blend mode
-	SDL_SetRenderDrawBlendMode(renderer,prev_blend_mode);
 }
 
-Cursor text_box_move_cursor_left(TextBox* box, Cursor cursor)
+TextCursor text_box_move_cursor_left(TextBox* box, TextCursor cursor)
 {
-	Cursor new_cursor_pos = cursor;
+	TextCursor new_cursor_pos = cursor;
 
 	new_cursor_pos.place_after_last_char_before_wrapping = false;
 	if (cursor.char_offset > 0) {
@@ -926,9 +819,9 @@ Cursor text_box_move_cursor_left(TextBox* box, Cursor cursor)
 	return new_cursor_pos;
 }
 
-Cursor text_box_move_cursor_right(TextBox* box, Cursor cursor)
+TextCursor text_box_move_cursor_right(TextBox* box, TextCursor cursor)
 {
-	Cursor new_cursor_pos = cursor;
+	TextCursor new_cursor_pos = cursor;
 
 	new_cursor_pos.place_after_last_char_before_wrapping = false;
 	TextLine* cursor_line = get_cursor_line(box);
@@ -960,9 +853,9 @@ size_t get_char_offset_from_line_and_char_coord(TextLine* line, size_t char_x, s
 	return char_offset;
 }
 
-Cursor text_box_move_cursor_up(TextBox* box, Cursor cursor)
+TextCursor text_box_move_cursor_up(TextBox* box, TextCursor cursor)
 {
-	Cursor new_cursor_pos = cursor;
+	TextCursor new_cursor_pos = cursor;
 	if (cursor.char_offset == 0 && cursor.line_number == 0) {
 		return new_cursor_pos;
 	}
@@ -1003,9 +896,9 @@ Cursor text_box_move_cursor_up(TextBox* box, Cursor cursor)
 	return new_cursor_pos;
 }
 
-Cursor text_box_move_cursor_down(TextBox* box, Cursor cursor)
+TextCursor text_box_move_cursor_down(TextBox* box, TextCursor cursor)
 {
-	Cursor new_cursor_pos = cursor;
+	TextCursor new_cursor_pos = cursor;
 
 	TextLine* cursor_line = get_cursor_line(box);
 
@@ -1039,9 +932,9 @@ Cursor text_box_move_cursor_down(TextBox* box, Cursor cursor)
 	return new_cursor_pos;
 }
 
-Cursor text_box_delete_a_character(TextBox* box, Cursor cursor)
+TextCursor text_box_delete_a_character(TextBox* box, TextCursor cursor)
 {
-	Cursor new_cursor_pos = cursor;
+	TextCursor new_cursor_pos = cursor;
 
 	if (cursor.line_number == 0 && cursor.char_offset == 0) {
 		return new_cursor_pos;
@@ -1084,9 +977,9 @@ Cursor text_box_delete_a_character(TextBox* box, Cursor cursor)
 	return new_cursor_pos;
 }
 
-Cursor text_box_delete_range(TextBox* box, Selection selection)
+TextCursor text_box_delete_range(TextBox* box, Selection selection)
 {
-	Cursor new_cursor_pos = box->cursor;
+	TextCursor new_cursor_pos = box->cursor;
 
 	selection = normalize_selection(selection);
 
@@ -1136,14 +1029,14 @@ Cursor text_box_delete_range(TextBox* box, Selection selection)
 
 void text_box_resize(TextBox* box, int w, int h)
 {
-	SDL_Texture *new_render_texture = SDL_CreateTexture(box->renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, w, h);
+	SDL_Surface *new_render_surface = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32, box->render_surface->format->format);
 
-	if (!new_render_texture) {
+	if (!new_render_surface) {
 		fprintf(stderr, "%s:%d:ERROR : Failed to resize text box!!! : %s", __FILE__, __LINE__, SDL_GetError());
 		return;
 	}
-	SDL_DestroyTexture(box->texture);
-	box->texture = new_render_texture;
+	SDL_FreeSurface(box->render_surface);
+	box->render_surface = new_render_surface;
 
 	box->w = w;
 	box->h = h;
