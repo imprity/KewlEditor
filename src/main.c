@@ -11,7 +11,7 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 
-#include "OSEvent.h"
+#include "OS.h"
 
 #define TEST_FONT "NotoSansKR-Medium.otf"
 

@@ -5,7 +5,7 @@
 #include "TextLine.h"
 #include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL.h>
-#include "OSEvent.h"
+#include "OS.h"
 
 
 typedef struct TextCursor {

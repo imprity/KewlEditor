@@ -10,8 +10,8 @@ set(SRCS
 	"${SRC_DIR}/TextBox.h" 
 	"${SRC_DIR}/TextLine.c" 
 	"${SRC_DIR}/TextLine.h"
-	"${SRC_DIR}/OSEvent.c" 
-	"${SRC_DIR}/OSEvent.h"
+	"${SRC_DIR}/OS.c" 
+	"${SRC_DIR}/OS.h"
 	"${CMAKE_CURRENT_SOURCE_DIR}/UTF8String/UTFString.c" 
 	"${CMAKE_CURRENT_SOURCE_DIR}/UTF8String/UTFString.h"
 	)
