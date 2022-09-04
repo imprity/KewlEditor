@@ -2,9 +2,19 @@ cmake_minimum_required(VERSION 3.21)
 
 project(KewlEditor)
 
-set(SRCS main.c TextBox.c TextBox.h TextLine.c TextLine.h OSEvent.c OSEvent.h
-"${CMAKE_CURRENT_SOURCE_DIR}/UTF8String/UTFString.c" 
-"${CMAKE_CURRENT_SOURCE_DIR}/UTF8String/UTFString.h")
+set(SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
+set(SRCS 
+	"${SRC_DIR}/main.c" 
+	"${SRC_DIR}/TextBox.c"
+	"${SRC_DIR}/TextBox.h" 
+	"${SRC_DIR}/TextLine.c" 
+	"${SRC_DIR}/TextLine.h"
+	"${SRC_DIR}/OSEvent.c" 
+	"${SRC_DIR}/OSEvent.h"
+	"${CMAKE_CURRENT_SOURCE_DIR}/UTF8String/UTFString.c" 
+	"${CMAKE_CURRENT_SOURCE_DIR}/UTF8String/UTFString.h"
+	)
 
 add_executable(KewlEditor ${SRCS}) 
 
