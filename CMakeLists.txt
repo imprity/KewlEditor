@@ -40,11 +40,13 @@ else()
    message("Could not find SDL2 Package. Trying to link to built in static lib")
 
    add_library(SDL2 STATIC IMPORTED)
+   
+   set(SDL_DEPENDENCIES pthread m dl rt)
 
     set_target_properties(SDL2 PROPERTIES
    		IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/SDL2-2.24.0/lib/libSDL2.a"
    		INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/SDL2-2.24.0/include"
-		INTERFACE_LINK_LIBRARIES "pthread m dl rt"
+		INTERFACE_LINK_LIBRARIES "${SDL_DEPENDENCIES}"
    	)
 
     add_library(SDL2_main STATIC IMPORTED)
