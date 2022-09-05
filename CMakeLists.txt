@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.21)
+cmake_minimum_required(VERSION 3.10)
 
 project(KewlEditor)
 
@@ -27,7 +27,7 @@ target_link_libraries(KewlEditor X11)
 target_include_directories(KewlEditor PRIVATE X11)
 
 #To be honest I am not sure which standard to use...
-set_property(TARGET KewlEditor PROPERTY C_STANDARD 17)
+set_property(TARGET KewlEditor PROPERTY C_STANDARD 11)
 
 #try to find the sdl package
 find_package(SDL2)
@@ -38,20 +38,21 @@ if(SDL2_FOUND)
 else()
    #if we could not find sdl package then try to link with built in sdl statically
    message("Could not find SDL2 Package. Trying to link to built in static lib")
+
    add_library(SDL2 STATIC IMPORTED)
-   set_target_properties(SDL2 PROPERTIES
-   	IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/SDL2-2.24.0/lib/libSDL2.a"
-   	INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/SDL2-2.24.0/include"
+
+    set_target_properties(SDL2 PROPERTIES
+   		IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/SDL2-2.24.0/lib/libSDL2.a"
+   		INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/SDL2-2.24.0/include"
+		INTERFACE_LINK_LIBRARIES "pthread m dl rt"
    	)
 
-   add_library(SDL2_main STATIC IMPORTED)
-   set_target_properties(SDL2_main PROPERTIES
-   	IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/SDL2-2.24.0/lib/libSDL2main.a"
+    add_library(SDL2_main STATIC IMPORTED)
+    set_target_properties(SDL2_main PROPERTIES
+   		IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/SDL2-2.24.0/lib/libSDL2main.a"
    	)
-   target_link_libraries(KewlEditor SDL2)
-   target_link_libraries(KewlEditor SDL2_main)
-   
-   target_link_libraries(SDL2 INTERFACE pthread m dl rt)
+    target_link_libraries(KewlEditor SDL2)
+    target_link_libraries(KewlEditor SDL2_main)
 endif()
 
 #try to find the sdl2_ttf package 
@@ -59,27 +60,27 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdl2)
 
 find_package(SDL2_ttf 2.20.0)
 
-
-
 if(SDL2_ttf_FOUND)
 	target_link_libraries(KewlEditor ${SDL2_TTF_LIBRARIES})
 	target_include_directories(KewlEditor PRIVATE ${SDL2_TTF_INCLUDE_DIR})	
 else()
 	#if we could not find sdl2_ttf package, then try to link with built in sdl2_ttf statically
 	message("Could not find SDL2_ttf Package. Trying to link to built in static lib")
-	add_library(SDL2_ttf STATIC IMPORTED)
-	set_target_properties(SDL2_ttf PROPERTIES
-		IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/SDL2_ttf-2.20.1/lib/libSDL2_ttf.a"
-		INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/SDL2_ttf-2.20.1/include"
-		)
 
 	add_library(freetype STATIC IMPORTED)
 	set_target_properties(freetype PROPERTIES
 		IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/SDL2_ttf-2.20.1/lib/libfreetype.a"
 		)
-	target_link_libraries(SDL2_ttf INTERFACE freetype)
+
+	add_library(SDL2_ttf STATIC IMPORTED)
+	set_target_properties(SDL2_ttf PROPERTIES
+		IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/SDL2_ttf-2.20.1/lib/libSDL2_ttf.a"
+		INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/SDL2_ttf-2.20.1/include"
+		INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/SDL2-2.24.0/include/SDL2"
+		INTERFACE_LINK_LIBRARIES freetype
+		)
+
 	target_link_libraries(KewlEditor SDL2_ttf)
-	target_include_directories(SDL2_ttf INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/SDL2-2.24.0/include/SDL2")
 endif()
 
 #copy font to directory
