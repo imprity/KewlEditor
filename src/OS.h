@@ -16,6 +16,7 @@ typedef enum
     OS_KEY_PRESS_EVENT,
     OS_KEY_RELEASE_EVENT,
     OS_TEXT_INPUT_EVENT,
+    OS_TEXT_PREEDIT_EVENT,
 }OS_EventType;
 
 typedef enum
@@ -29,6 +30,9 @@ typedef enum
 
     OS_KMOD_NUM    = (1 << 4),
     OS_KMOD_CAPS   = (1 << 5),
+
+    OS_KMOD_LCTRL  = (1 << 6),
+    OS_KMOD_RCTRL  = (1 << 7)
 }OS_Keymod;
 
 #define OS_KMOD_CTRL   (OS_KMOD_LCTRL  | OS_KMOD_RCTRL)
@@ -145,11 +149,21 @@ typedef struct
     UTFStringView text_sv;
 } OS_TextInputEvent;
 
+/*
+Kinda gave up on getting preedit string on linux so it won't emit
+this event
+*/
+typedef struct
+{
+    UTFStringView preedit_sv;
+} OS_TextPreeditEvent;
+
 typedef struct
 {
     OS_KeyboardEvent keyboard_event;
     OS_TextInputEvent text_input_event;
     OS_ResizeEvent resize_event;
+    OS_TextPreeditEvent text_preedit_event;
     OS_EventType type;
 } OS_Event;
 

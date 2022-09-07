@@ -100,6 +100,9 @@ TextCursor text_box_move_cursor_right(TextBox* box, TextCursor cursor);
 TextCursor text_box_move_cursor_up(TextBox* box, TextCursor cursor);
 TextCursor text_box_move_cursor_down(TextBox* box, TextCursor cursor);
 
+TextCursor text_box_move_cursor_left_word(TextBox* box, TextCursor cursor);
+TextCursor text_box_move_cursor_right_word(TextBox* box, TextCursor cursor);
+
 TextCursor text_box_delete_a_character(TextBox* box, TextCursor cursor);
 TextCursor text_box_delete_range(TextBox* box, Selection selection);
 

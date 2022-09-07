@@ -34,18 +34,6 @@ OS* GLOBAL_OS;
 TextBox* GLOBAL_BOX;
 
 
-void os_set_ime_preedit_pos(int x, int y)
-{
-    if(!GLOBAL_OS){
-        return;
-    }
-    XPoint spot = {.x = x, .y = y};
-    XVaNestedList preedit_attr;
-    preedit_attr = XVaCreateNestedList(0, XNSpotLocation, &spot, NULL);
-    XSetICValues(GLOBAL_OS->xic, XNPreeditAttributes, preedit_attr, NULL);
-    XFree(preedit_attr);
-}
-
 OS_Keymod os_get_mod_state()
 {
     if(!GLOBAL_OS){
@@ -54,61 +42,19 @@ OS_Keymod os_get_mod_state()
     return GLOBAL_OS->key_mod;
 }
 
-////////////////////////////////
-//IME callbacks
-////////////////////////////////
-
-static int preedit_start_callback(
-    XIM xim,
-    XPointer client_data,
-    XPointer call_data)
+void os_set_ime_preedit_pos(int x, int y)
 {
-    printf("preedit start\n");
-    // no length limit
-    return -1;
-}
-
-static void preedit_done_callback(
-    XIM xim,
-    XPointer client_data,
-    XPointer call_data)
-{
-    printf("preedit done\n");
-}
-
-static void preedit_draw_callback(
-    XIM xim,
-    XPointer client_data,
-    XIMPreeditDrawCallbackStruct *call_data)
-{
-
-    printf("callback\n");
-    XIMText *xim_text = call_data->text;
-    if (xim_text != NULL)
-    {
-        printf("Draw callback string: %s, length: %d, first: %d, caret: %d\n", xim_text->string.multi_byte, call_data->chg_length, call_data->chg_first, call_data->caret);
+    if(!GLOBAL_OS){
+        return;
     }
-    else
-    {
-        printf("Draw callback string: (DELETED), length: %d, first: %d, caret: %d\n", call_data->chg_length, call_data->chg_first, call_data->caret);
-    }
+    XPoint spot = {.x = x, .y = y};
+    XVaNestedList preedit_attributes = XVaCreateNestedList(
+                                           0,
+                                           XNSpotLocation, &spot,
+                                           NULL);
+    XSetICValues(GLOBAL_OS->xic, XNPreeditAttributes, preedit_attributes, NULL);
+    XFree(preedit_attributes);
 }
-
-static void preedit_caret_callback(
-    XIM xim,
-    XPointer client_data,
-    XIMPreeditCaretCallbackStruct *call_data)
-{
-    printf("preedit caret\n");
-    if (call_data != NULL)
-    {
-        printf("direction: %d position: %d\n", call_data->direction, call_data->position);
-    }
-}
-
-////////////////////////////////
-//End of IME callbacks
-////////////////////////////////
 
 ////////////////////////////////
 //Key handling
@@ -226,7 +172,9 @@ static const struct
     {XK_Alt_R, OS_KMOD_RALT},
 
     {XK_Num_Lock, OS_KMOD_NUM},
-    {XK_Caps_Lock, OS_KMOD_CAPS}
+    {XK_Caps_Lock, OS_KMOD_CAPS},
+    {XK_Control_L, OS_KMOD_LCTRL},
+    {XK_Control_R, OS_KMOD_RCTRL},
 };
 
 static bool x11_keysym_to_os_keysym(KeySym xkeysym, OS_KeySym* out_os_keysym)
@@ -301,31 +249,10 @@ int linux_main(TextBox* _box, int argc, char* argv[])
     /* initialize IM and IC */
     GLOBAL_OS->xim = XOpenIM(GLOBAL_OS->display, NULL, NULL, NULL);
 
-    XIMCallback draw_callback;
-    draw_callback.client_data = NULL;
-    draw_callback.callback = (XIMProc)preedit_draw_callback;
-    XIMCallback start_callback;
-    start_callback.client_data = NULL;
-    start_callback.callback = (XIMProc)preedit_start_callback;
-    XIMCallback done_callback;
-    done_callback.client_data = NULL;
-    done_callback.callback = (XIMProc)preedit_done_callback;
-    XIMCallback caret_callback;
-    caret_callback.client_data = NULL;
-    caret_callback.callback = (XIMProc)preedit_caret_callback;
-    XVaNestedList preedit_attributes = XVaCreateNestedList(
-                                           0,
-                                           XNPreeditStartCallback, &start_callback,
-                                           XNPreeditDoneCallback, &done_callback,
-                                           XNPreeditDrawCallback, &draw_callback,
-                                           XNPreeditCaretCallback, &caret_callback,
-                                           NULL);
-
     GLOBAL_OS->xic = XCreateIC(GLOBAL_OS->xim,
                        /* the following are in attr, val format, terminated by NULL */
-                       XNInputStyle, XIMPreeditNothing | XIMStatusNothing,
+                       XNInputStyle, XIMPreeditNothing |  XIMStatusNothing,
                        XNClientWindow, GLOBAL_OS->window,
-                       XNPreeditAttributes, preedit_attributes,
                        NULL);
 
     if(!GLOBAL_OS->xic){
@@ -375,8 +302,11 @@ int linux_main(TextBox* _box, int argc, char* argv[])
 
     bool quit = false;
 
+
+
     while(!quit)
     {
+
         while(XPending(GLOBAL_OS->display))
         {
 
@@ -517,13 +447,11 @@ int linux_main(TextBox* _box, int argc, char* argv[])
                         text_box_handle_event(GLOBAL_BOX, &quit_event);
                         quit = true;
                     }
+
                 }
                 break;
-
             }
         }
-
-        XFlush(GLOBAL_OS->display);
     }
 
 cleanup: ;
@@ -535,4 +463,5 @@ cleanup: ;
 
     return 0;
 }
+
 
