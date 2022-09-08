@@ -1,5 +1,6 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/Xatom.h>
 #include <X11/Xos.h>
 
 #include <stdio.h>
@@ -27,13 +28,24 @@ typedef struct OS
     OS_Keymod key_mod;
     size_t window_width;
     size_t window_height;
+    UTFString* clipboard_text;
 } OS;
 
 OS* GLOBAL_OS;
 
 TextBox* GLOBAL_BOX;
 
+///////////////////
+//Global Atoms
+///////////////////
+Atom WM_QUIT_ATOM = None;
+Atom CLIPBOARD_ATOM = None;
+Atom UTF8_ATOM = None;
 
+
+///////////////////
+//OS functions
+///////////////////
 OS_Keymod os_get_mod_state()
 {
     if(!GLOBAL_OS){
@@ -54,6 +66,11 @@ void os_set_ime_preedit_pos(int x, int y)
                                            NULL);
     XSetICValues(GLOBAL_OS->xic, XNPreeditAttributes, preedit_attributes, NULL);
     XFree(preedit_attributes);
+}
+
+void os_request_text_paste()
+{
+    XConvertSelection(GLOBAL_OS->display, CLIPBOARD_ATOM, UTF8_ATOM, None, GLOBAL_OS->window, CurrentTime);
 }
 
 ////////////////////////////////
@@ -208,6 +225,26 @@ static bool x11_keysym_to_os_keymod(KeySym xkeysym, OS_Keymod* out_os_keymod)
 }
 
 
+//remove non printable characters
+//We are only removing control characters(https://www.compart.com/en/unicode/category/Cc)
+//that ranges (u+0001 u+001f) (u+007f u+009F)
+//except new line
+
+//TODO : maybe check more rigorously
+void remove_contorl_characters(UTFString* str){
+    size_t char_index = 0;
+    while(char_index < str->count){
+        UTFStringView sv = utf_sv_sub_str(str, char_index, char_index+1);
+        uint32_t char_code_at = utf8_to_32(sv.data, sv.data_size);
+        if( ((char_code_at >= 0x0001 && char_code_at <=0x001f) || (char_code_at >= 0x007f && char_code_at <=0x009f)) && char_code_at != '\n'){
+            utf_erase_range(str, char_index, char_index+1);
+        }
+        else{
+            char_index++;
+        }
+    }
+}
+
 int linux_main(TextBox* _box, int argc, char* argv[])
 {
     GLOBAL_BOX = _box;
@@ -220,6 +257,9 @@ int linux_main(TextBox* _box, int argc, char* argv[])
 
     OS _os;
     GLOBAL_OS = &_os;
+
+    //create empty text for clipboard
+    GLOBAL_OS->clipboard_text = utf_from_cstr("");
 
     /* fallback to LC_CTYPE in env */
     setlocale(LC_CTYPE, "");
@@ -266,8 +306,8 @@ int linux_main(TextBox* _box, int argc, char* argv[])
     XSelectInput(GLOBAL_OS->display, GLOBAL_OS->window,
         KeyPressMask | KeyReleaseMask | ExposureMask | StructureNotifyMask);
 
-    Atom wmDeleteMessage = XInternAtom(GLOBAL_OS->display, "WM_DELETE_WINDOW", false);
-    XSetWMProtocols(GLOBAL_OS->display, GLOBAL_OS->window, &wmDeleteMessage, 1);
+    WM_QUIT_ATOM = XInternAtom(GLOBAL_OS->display, "WM_DELETE_WINDOW", false);
+    XSetWMProtocols(GLOBAL_OS->display, GLOBAL_OS->window, &WM_QUIT_ATOM, 1);
 
     GLOBAL_OS->key_mod = OS_KMOD_NONE;
 
@@ -279,6 +319,21 @@ int linux_main(TextBox* _box, int argc, char* argv[])
 
     if(!ximage){
         fprintf(stderr, "%s:%d:Failed to create x image\n", __FILE__, __LINE__);
+        init_success = false;
+    }
+
+    ////////////////////////////////
+    // setup atoms for clipboard
+    ////////////////////////////////
+    CLIPBOARD_ATOM = XInternAtom(GLOBAL_OS->display, "CLIPBOARD", false);
+    if(CLIPBOARD_ATOM == None){
+        fprintf(stderr, "%s:%d:Failed to get clipboard atom\n", __FILE__, __LINE__);
+        init_success = false;
+    }
+
+    UTF8_ATOM = XInternAtom(GLOBAL_OS->display, "UTF8_STRING", false);
+    if(UTF8_ATOM == None){
+        fprintf(stderr, "%s:%d:Failed to get utf8 atom\n", __FILE__, __LINE__);
         init_success = false;
     }
 
@@ -301,8 +356,6 @@ int linux_main(TextBox* _box, int argc, char* argv[])
     XPutImage(GLOBAL_OS->display, GLOBAL_OS->window, XDefaultGC(GLOBAL_OS->display, GLOBAL_OS->screen), ximage, 0, 0, 0, 0, GLOBAL_BOX->w, GLOBAL_BOX->h);
 
     bool quit = false;
-
-
 
     while(!quit)
     {
@@ -400,17 +453,7 @@ int linux_main(TextBox* _box, int argc, char* argv[])
                         //TODO : maybe check more rigorously
 
                         utf_set_cstr(tmp_str, char_buffer);
-                        size_t char_index = 0;
-                        while(char_index < tmp_str->count){
-                            UTFStringView sv = utf_sv_sub_str(tmp_str, char_index, char_index+1);
-                            uint32_t char_code_at = utf8_to_32(sv.data, sv.data_size);
-                            if((char_code_at >= 0x0001 && char_code_at <=0x001f) || (char_code_at >= 0x007f && char_code_at <=0x009f)){
-                                utf_erase_range(tmp_str, char_index, char_index+1);
-                            }
-                            else{
-                                char_index++;
-                            }
-                        }
+                        remove_contorl_characters(tmp_str);
                         if(tmp_str->count > 0){
                             OS_TextInputEvent input_event;
                             input_event.text_sv =utf_sv_from_str(tmp_str);
@@ -441,7 +484,7 @@ int linux_main(TextBox* _box, int argc, char* argv[])
 
                 case ClientMessage:
                 {
-                    if(xevent.xclient.data.l[0] == wmDeleteMessage)
+                    if(xevent.xclient.data.l[0] == WM_QUIT_ATOM)
                     {
                         OS_Event quit_event = {.type = OS_QUIT_EVENT};
                         text_box_handle_event(GLOBAL_BOX, &quit_event);
@@ -450,7 +493,65 @@ int linux_main(TextBox* _box, int argc, char* argv[])
 
                 }
                 break;
+
+                case SelectionNotify:
+                {
+                    //handle copy pasting event
+                    //TOOD : This is probably not safe we should check if text is malicious or not
+                    XSelectionEvent selection_event = xevent.xselection;
+                    //selection_event.
+                    if(selection_event.property != None){
+                        //shamelessly copied from https://github.com/edrosten/x_clipboard/blob/master/paste.cc
+                        Atom actual_type;
+                        int actual_format;
+                        unsigned long nitems;
+                        unsigned long bytes_after;
+                        unsigned char *ret = 0;
+
+                        int read_bytes = 1024;
+
+                        //Keep trying to read the property until there are no
+                        //bytes unread.
+                        do
+                        {
+                            if(ret != 0)
+                                XFree(ret);
+                            XGetWindowProperty(GLOBAL_OS->display, GLOBAL_OS->window, selection_event.property, 0, read_bytes, False, AnyPropertyType,
+                                                &actual_type, &actual_format, &nitems, &bytes_after,
+                                                &ret);
+
+                            read_bytes *= 2;
+                        }while(bytes_after != 0);
+
+                        //we won't try to pass anything unless it's utf8
+                        //TODO : Maybe try to parse thing if format is different
+                        if(actual_type == UTF8_ATOM){
+                            utf_set_cstr(GLOBAL_OS->clipboard_text, ret);
+
+                            remove_contorl_characters(GLOBAL_OS->clipboard_text);
+
+                            OS_TextPasteEvent paste_event = {.paste_sv = utf_sv_from_str(GLOBAL_OS->clipboard_text)};
+                            OS_Event wrapped_paste_event = {.text_paste_event = paste_event, .type = OS_TEXT_PASTE_EVENT};
+
+                            text_box_handle_event(GLOBAL_BOX, &wrapped_paste_event);
+                        }
+                        XFree(ret);
+                    }
+                }break;
             }
+        }
+
+        text_box_render(GLOBAL_BOX);
+        bool locked = false;
+        if(SDL_MUSTLOCK(GLOBAL_BOX->render_surface)){
+            locked = true;
+            SDL_LockSurface(GLOBAL_BOX->render_surface);
+        }
+
+        XPutImage(GLOBAL_OS->display, GLOBAL_OS->window, XDefaultGC(GLOBAL_OS->display, GLOBAL_OS->screen), ximage, 0, 0, 0, 0, GLOBAL_BOX->w, GLOBAL_BOX->h);
+
+        if(locked){
+            SDL_UnlockSurface(GLOBAL_BOX->render_surface);
         }
     }
 
@@ -458,6 +559,7 @@ cleanup: ;
 
     if(char_buffer) {free(char_buffer);}
     if(tmp_str) {utf_destroy(tmp_str);}
+    if(GLOBAL_OS->clipboard_text) {utf_destroy(GLOBAL_OS->clipboard_text);}
     if(GLOBAL_OS->xic) {XDestroyIC(GLOBAL_OS->xic);}
     if(GLOBAL_OS->window) {XDestroyWindow(GLOBAL_OS->display,GLOBAL_OS->window);}
 

@@ -91,7 +91,7 @@ void text_box_destroy(TextBox* box);
 
 void text_box_handle_event(TextBox* box, OS_Event* event);
 
-TextCursor text_box_type(TextBox* box, TextCursor cursor, char* c);
+TextCursor text_box_type(TextBox* box, TextCursor cursor, UTFStringView sv);
 
 void text_box_render(TextBox* box);
 

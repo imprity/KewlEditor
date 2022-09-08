@@ -252,7 +252,7 @@ void text_box_handle_event(TextBox* box, OS_Event* event)
             if (have_selection) {
                 box->cursor = text_box_delete_range(box, box->selection);
             }
-            box->cursor = text_box_type(box, box->cursor, event->text_input_event.text_sv.data);
+            box->cursor = text_box_type(box, box->cursor, event->text_input_event.text_sv);
             box->selection = set_selection_to_cursor(box->cursor);
             if (!holding_shift) {
                 box->is_selecting = false;
@@ -267,7 +267,7 @@ void text_box_handle_event(TextBox* box, OS_Event* event)
                     if (have_selection) {
                         box->cursor = text_box_delete_range(box, box->selection);
                     }
-                    box->cursor = text_box_type(box, box->cursor, "\n");
+                    box->cursor = text_box_type(box, box->cursor, utf_sv_from_cstr("\n"));
                     box->selection = set_selection_to_cursor(box->cursor);
                     if (!holding_shift) {
                         box->is_selecting = false;
@@ -363,14 +363,34 @@ void text_box_handle_event(TextBox* box, OS_Event* event)
                 }break;
 
                 case OS_KEY_F1: {
-                    box->cursor = text_box_type(box, box->cursor, TEST_TEXT_ENGLISH);
+                    box->cursor = text_box_type(box, box->cursor, utf_sv_from_cstr(TEST_TEXT_ENGLISH));
                     box->offset_y = calculate_new_box_offset_y(box, box->cursor);
                 }break;
                 case OS_KEY_F2: {
-                    box->cursor = text_box_type(box, box->cursor, TEST_TEXT_KOREAN);
+                    box->cursor = text_box_type(box, box->cursor, utf_sv_from_cstr(TEST_TEXT_KOREAN));
                     box->offset_y = calculate_new_box_offset_y(box, box->cursor);
                 }break;
+
+                //handle ctrl v event
+                case OS_KEY_v:
+                case OS_KEY_V: {
+                    if(holding_ctrl){
+                        os_request_text_paste();
+                    }
+                }break;
             }
+        }break;
+        case OS_TEXT_PASTE_EVENT:
+        {
+            if (have_selection) {
+                box->cursor = text_box_delete_range(box, box->selection);
+            }
+            box->cursor = text_box_type(box, box->cursor, event->text_paste_event.paste_sv);
+            box->selection = set_selection_to_cursor(box->cursor);
+            if (!holding_shift) {
+                box->is_selecting = false;
+            }
+            box->offset_y = calculate_new_box_offset_y(box, box->cursor);
         }break;
 	}
 
@@ -500,9 +520,8 @@ void text_box_destroy(TextBox* box)
 	free(box);
 }
 
-TextCursor text_box_type(TextBox* box, TextCursor cursor, char* c)
+TextCursor text_box_type(TextBox* box, TextCursor cursor, UTFStringView sv)
 {
-	UTFStringView sv = utf_sv_from_cstr(c);
 	int new_line_index = utf_sv_find(sv, utf_sv_from_cstr(u8"\n"));
 	bool has_new_line = new_line_index >= 0;
 
@@ -1067,7 +1086,8 @@ TextCursor text_box_move_cursor_left_word(TextBox* box, TextCursor cursor)
         //if there is a space at left return
         UTFStringView sv = utf_sv_from_str(cursor_line->str);
         UTFStringView at_left = utf_sv_sub_sv(sv, cursor.char_offset - 1 , cursor.char_offset);
-        if(utf_sv_cmp(at_left, utf_sv_from_cstr(u8" ")))
+        UTFStringView at_right = utf_sv_sub_sv(sv, cursor.char_offset, cursor.char_offset+1);
+        if( utf_sv_cmp(at_left, utf_sv_from_cstr(u8" ")) && !utf_sv_cmp(at_right, utf_sv_from_cstr(u8" ")) )
         {
             return cursor;
         }
@@ -1078,7 +1098,7 @@ TextCursor text_box_move_cursor_right_word(TextBox* box, TextCursor cursor)
     TextLine* cursor_line = get_line_from_line_number(box, cursor.line_number);
 
     //first check if we can go right
-    if(cursor.line_number >= cursor_line->str->count && cursor_line->next == NULL){
+    if(cursor.char_offset >= cursor_line->str->count && cursor_line->next == NULL){
         return cursor;
     }
 
@@ -1102,7 +1122,8 @@ TextCursor text_box_move_cursor_right_word(TextBox* box, TextCursor cursor)
         //if there is a space at left return
         UTFStringView sv = utf_sv_from_str(cursor_line->str);
         UTFStringView at_left = utf_sv_sub_sv(sv, cursor.char_offset - 1 , cursor.char_offset);
-        if(utf_sv_cmp(at_left, utf_sv_from_cstr(u8" ")))
+        UTFStringView at_right = utf_sv_sub_sv(sv, cursor.char_offset, cursor.char_offset+1);
+        if( utf_sv_cmp(at_left, utf_sv_from_cstr(u8" ")) && !utf_sv_cmp(at_right, utf_sv_from_cstr(u8" ")) )
         {
             return cursor;
         }

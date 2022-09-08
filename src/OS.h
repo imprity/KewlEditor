@@ -17,6 +17,7 @@ typedef enum
     OS_KEY_RELEASE_EVENT,
     OS_TEXT_INPUT_EVENT,
     OS_TEXT_PREEDIT_EVENT,
+    OS_TEXT_PASTE_EVENT
 }OS_EventType;
 
 typedef enum
@@ -160,10 +161,16 @@ typedef struct
 
 typedef struct
 {
+    UTFStringView paste_sv;
+} OS_TextPasteEvent;
+
+typedef struct
+{
     OS_KeyboardEvent keyboard_event;
     OS_TextInputEvent text_input_event;
     OS_ResizeEvent resize_event;
     OS_TextPreeditEvent text_preedit_event;
+    OS_TextPasteEvent text_paste_event;
     OS_EventType type;
 } OS_Event;
 
@@ -177,6 +184,7 @@ extern OS *GLOBAL_OS;
 
 void os_set_ime_preedit_pos(int x, int y);
 OS_Keymod os_get_mod_state();
+void os_request_text_paste();
 
 
 #endif
