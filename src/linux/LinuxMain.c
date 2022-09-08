@@ -539,20 +539,20 @@ int linux_main(TextBox* _box, int argc, char* argv[])
                     }
                 }break;
             }
+            text_box_render(GLOBAL_BOX);
+            bool locked = false;
+            if(SDL_MUSTLOCK(GLOBAL_BOX->render_surface)){
+                locked = true;
+                SDL_LockSurface(GLOBAL_BOX->render_surface);
+            }
+
+            XPutImage(GLOBAL_OS->display, GLOBAL_OS->window, XDefaultGC(GLOBAL_OS->display, GLOBAL_OS->screen), ximage, 0, 0, 0, 0, GLOBAL_BOX->w, GLOBAL_BOX->h);
+
+            if(locked){
+                SDL_UnlockSurface(GLOBAL_BOX->render_surface);
+            }
         }
 
-        text_box_render(GLOBAL_BOX);
-        bool locked = false;
-        if(SDL_MUSTLOCK(GLOBAL_BOX->render_surface)){
-            locked = true;
-            SDL_LockSurface(GLOBAL_BOX->render_surface);
-        }
-
-        XPutImage(GLOBAL_OS->display, GLOBAL_OS->window, XDefaultGC(GLOBAL_OS->display, GLOBAL_OS->screen), ximage, 0, 0, 0, 0, GLOBAL_BOX->w, GLOBAL_BOX->h);
-
-        if(locked){
-            SDL_UnlockSurface(GLOBAL_BOX->render_surface);
-        }
     }
 
 cleanup: ;

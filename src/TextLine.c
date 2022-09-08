@@ -198,4 +198,11 @@ void text_line_test()
     for (TextLine* line = first; line != NULL; line = line->next) {
         printf("%zu : %s\n",line->line_number, line->str->data);
     }
+
+    TextLine *tmp = first;
+    while(tmp != NULL){
+        TextLine* next = tmp->next;
+        text_line_destroy(tmp);
+        tmp = next;
+    }
 }

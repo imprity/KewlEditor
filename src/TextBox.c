@@ -113,25 +113,27 @@ void get_char_coord_from_cursor(
 	if (y) { *y = line->wrapped_line_count-1; }
 }
 
-UTFString* replace_missing_glyph_with_char(UTFString* str, TTF_Font* font, UTFStringView replacement) {
+//UTFString* replace_missing_glyph_with_char(UTFString* str, TTF_Font* font, UTFStringView replacement) {
+UTFString* replace_missing_glyph_with_char(UTFStringView sv, TTF_Font* font, UTFStringView replacement) {
 
 	size_t bit_offset = 0;
-	size_t ptr = str->data;
+	size_t ptr = sv.data;
 
 	UTFString* copy = utf_from_cstr("");
 
-	if (str->count == 0) {
+	if (sv.count == 0) {
 		return copy;
 	}
 
-	for (size_t i = 0; i < str->count; i++) {
-		size_t next = utf_next(str, bit_offset);
+	for (size_t i = 0; i < sv.count; i++) {
+		//size_t next = utf_next(str, bit_offset);
+		size_t next = utf_sv_next(sv, bit_offset);
 		uint32_t codepoint = utf8_to_32(ptr + bit_offset, next - bit_offset);
 		if (!TTF_GlyphIsProvided32(font, codepoint)) {
 			utf_append_sv(copy, replacement);
 		}
 		else {
-			UTFStringView character = utf_sv_sub_str(str, i, i + 1);
+			UTFStringView character = utf_sv_sub_sv(sv, i, i + 1);
 			utf_append_sv(copy, character);
 		}
 		bit_offset = next;
@@ -176,7 +178,7 @@ void get_cursor_screen_pos(TextBox* box, int* cursor_x, int* cursor_y)
 		sv = utf_sv_trim_left(sv, cursor_line->wrapped_line_sizes[i]);
 	}
 
-	UTFString* copy = replace_missing_glyph_with_char(utf_from_sv(sv), box->font, utf_sv_from_cstr(MISSING_GLYPH));
+	UTFString* copy = replace_missing_glyph_with_char(sv, box->font, utf_sv_from_cstr(MISSING_GLYPH));
 
 	int measured_x = 0;
 	sv_fits(utf_sv_from_str(copy), box->font, box->w, NULL, &measured_x);
@@ -403,7 +405,7 @@ void text_box_handle_event(TextBox* box, OS_Event* event)
 
 void update_text_line(TextBox* box, TextLine* line)
 {
-	UTFString* copy = replace_missing_glyph_with_char(line->str, box->font, utf_sv_from_cstr(MISSING_GLYPH));
+	UTFString* copy = replace_missing_glyph_with_char(utf_sv_from_str(line->str), box->font, utf_sv_from_cstr(MISSING_GLYPH));
 
 	UTFStringView sv = utf_sv_from_str(copy);
 	int font_height = TTF_FontHeight(box->font);
@@ -512,6 +514,10 @@ void text_box_destroy(TextBox* box)
 		TextLine* tmp_next = line->next;
 		text_line_destroy(line);
 		line = tmp_next;
+	}
+
+	if(box->composite_str){
+        utf_destroy(box->composite_str);
 	}
 
 	if (box->render_surface)
@@ -747,7 +753,7 @@ void text_box_render(TextBox* box) {
 				outside_selecton = !completely_inside_selection && !partially_inside_selection;
 			}
 
-			UTFString* copy = replace_missing_glyph_with_char(line->str, box->font, utf_sv_from_cstr(MISSING_GLYPH));
+			UTFString* copy = replace_missing_glyph_with_char(utf_sv_from_str(line->str), box->font, utf_sv_from_cstr(MISSING_GLYPH));
 
 			if (outside_selecton || completely_inside_selection) {
 				UTFStringView sv = utf_sv_from_str(copy);
