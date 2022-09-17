@@ -28,7 +28,8 @@ typedef struct OS
     OS_Keymod key_mod;
     size_t window_width;
     size_t window_height;
-    UTFString* clipboard_text;
+    UTFString* clipboard_paste_text;
+    UTFString* clipboard_copy_text;
 } OS;
 
 OS* GLOBAL_OS;
@@ -68,9 +69,22 @@ void os_set_ime_preedit_pos(int x, int y)
     XFree(preedit_attributes);
 }
 
+
 void os_request_text_paste()
 {
-    XConvertSelection(GLOBAL_OS->display, CLIPBOARD_ATOM, UTF8_ATOM, None, GLOBAL_OS->window, CurrentTime);
+    if(!GLOBAL_OS){
+        return;
+    }
+    XConvertSelection(GLOBAL_OS->display, CLIPBOARD_ATOM, UTF8_ATOM, CLIPBOARD_ATOM, GLOBAL_OS->window, CurrentTime);
+}
+
+void os_set_clipboard_text(UTFStringView sv)
+{
+    if(!GLOBAL_OS){
+        return;
+    }
+	XSetSelectionOwner(GLOBAL_OS->display, CLIPBOARD_ATOM, GLOBAL_OS->window, CurrentTime);
+	utf_set_sv(GLOBAL_OS->clipboard_copy_text, sv);
 }
 
 ////////////////////////////////
@@ -259,7 +273,8 @@ int linux_main(TextBox* _box, int argc, char* argv[])
     GLOBAL_OS = &_os;
 
     //create empty text for clipboard
-    GLOBAL_OS->clipboard_text = utf_from_cstr("");
+    GLOBAL_OS->clipboard_paste_text = utf_from_cstr("");
+    GLOBAL_OS->clipboard_copy_text = utf_from_cstr("");
 
     /* fallback to LC_CTYPE in env */
     setlocale(LC_CTYPE, "");
@@ -336,6 +351,7 @@ int linux_main(TextBox* _box, int argc, char* argv[])
         fprintf(stderr, "%s:%d:Failed to get utf8 atom\n", __FILE__, __LINE__);
         init_success = false;
     }
+
 
     //TODO : For now we use char_buffer and tmp_str to store and parse string that came from xlib event
     //But I think we can handle it using only tmp_str
@@ -496,7 +512,7 @@ int linux_main(TextBox* _box, int argc, char* argv[])
 
                 case SelectionNotify:
                 {
-                    //handle copy pasting event
+                    //handle pasting event
                     //TOOD : This is probably not safe we should check if text is malicious or not
                     XSelectionEvent selection_event = xevent.xselection;
                     //selection_event.
@@ -526,17 +542,61 @@ int linux_main(TextBox* _box, int argc, char* argv[])
                         //we won't try to pass anything unless it's utf8
                         //TODO : Maybe try to parse thing if format is different
                         if(actual_type == UTF8_ATOM){
-                            utf_set_cstr(GLOBAL_OS->clipboard_text, ret);
+                            utf_set_cstr(GLOBAL_OS->clipboard_paste_text, ret);
 
-                            remove_contorl_characters(GLOBAL_OS->clipboard_text);
+                            remove_contorl_characters(GLOBAL_OS->clipboard_paste_text);
 
-                            OS_TextPasteEvent paste_event = {.paste_sv = utf_sv_from_str(GLOBAL_OS->clipboard_text)};
+                            OS_TextPasteEvent paste_event = {.paste_sv = utf_sv_from_str(GLOBAL_OS->clipboard_paste_text)};
                             OS_Event wrapped_paste_event = {.text_paste_event = paste_event, .type = OS_TEXT_PASTE_EVENT};
 
                             text_box_handle_event(GLOBAL_BOX, &wrapped_paste_event);
                         }
                         XFree(ret);
                     }
+                }break;
+
+				case SelectionRequest:
+				{
+					//handle copying event
+					printf("got selection request\n");
+					//shamelessly copied from https://github.com/edrosten/x_clipboard/blob/master/paste.cc
+					//TODO : Handle XA_TARGETS by converting utf8 to other formats
+
+                    XSelectionRequestEvent selection_request = xevent.xselectionrequest;
+					XEvent reply;
+					
+					//Extract the relavent data
+					Window owner     = selection_request.owner;
+					Atom selection   = selection_request.selection;
+					Atom target      = selection_request.target;
+					Atom property    = selection_request.property;
+					Window requestor = selection_request.requestor;
+					Time timestamp   = selection_request.time;
+					Display* display    = xevent.xselection.display;
+
+
+					//Start by constructing a refusal request.
+					reply.xselection.type      = SelectionNotify;
+					reply.xselection.requestor = requestor;
+					reply.xselection.selection = selection;
+					reply.xselection.target    = target;
+					reply.xselection.property  = None;   //This means refusal
+					reply.xselection.time      = timestamp;
+
+					if(selection_request.target == UTF8_ATOM){
+						printf("Got utf8\n");
+						reply.xselection.property = property;
+						XChangeProperty(display, requestor, property, target, 8, PropModeReplace,
+								GLOBAL_OS->clipboard_copy_text->data, GLOBAL_OS->clipboard_copy_text->data_size+1);
+					}
+
+					else
+					{
+						printf("No valid conversion. Replying with refusal.\n");
+					}
+
+					//Reply
+					XSendEvent(display, xevent.xselectionrequest.requestor, True, 0, &reply);
                 }break;
             }
             text_box_render(GLOBAL_BOX);
@@ -559,7 +619,10 @@ cleanup: ;
 
     if(char_buffer) {free(char_buffer);}
     if(tmp_str) {utf_destroy(tmp_str);}
-    if(GLOBAL_OS->clipboard_text) {utf_destroy(GLOBAL_OS->clipboard_text);}
+
+    if(GLOBAL_OS->clipboard_paste_text) {utf_destroy(GLOBAL_OS->clipboard_paste_text);}
+    if(GLOBAL_OS->clipboard_copy_text) {utf_destroy(GLOBAL_OS->clipboard_copy_text);}
+
     if(GLOBAL_OS->xic) {XDestroyIC(GLOBAL_OS->xic);}
     if(GLOBAL_OS->window) {XDestroyWindow(GLOBAL_OS->display,GLOBAL_OS->window);}
 

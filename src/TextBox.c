@@ -390,6 +390,21 @@ void text_box_handle_event(TextBox* box, OS_Event* event)
                         os_request_text_paste();
                     }
                 }break;
+
+                //handle ctrl c event
+                case OS_KEY_c:
+                case OS_KEY_C: {
+                    if(holding_ctrl){
+						if(have_selection){
+							UTFString* tmp = text_box_get_selection_str(box, box->selection);
+							os_set_clipboard_text(utf_sv_from_str(tmp));
+							utf_destroy(tmp);
+						}
+						else{
+							os_set_clipboard_text(utf_sv_from_cstr(u8""));
+						}
+                    }
+                }break;
             }
         }break;
         case OS_TEXT_PASTE_EVENT:

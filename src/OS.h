@@ -185,6 +185,6 @@ extern OS *GLOBAL_OS;
 void os_set_ime_preedit_pos(int x, int y);
 OS_Keymod os_get_mod_state();
 void os_request_text_paste();
-
+void os_set_clipboard_text(UTFStringView sv);
 
 #endif
