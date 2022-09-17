@@ -106,6 +106,8 @@ TextCursor text_box_move_cursor_right_word(TextBox* box, TextCursor cursor);
 TextCursor text_box_delete_a_character(TextBox* box, TextCursor cursor);
 TextCursor text_box_delete_range(TextBox* box, Selection selection);
 
+UTFString* text_box_get_selection_str(TextBox* box, Selection selection);
+
 void text_box_resize(TextBox* box, int w, int h);
 
 #endif

@@ -373,6 +373,16 @@ void text_box_handle_event(TextBox* box, OS_Event* event)
                     box->offset_y = calculate_new_box_offset_y(box, box->cursor);
                 }break;
 
+                case OS_KEY_F3: {
+					if(has_selection){
+						UTFString *tmp = text_box_get_selection_str(box, box->selection);
+						printf("--- selection str ---\n");
+						utf_sv_fprintln(utf_sv_from_str(tmp), stdout);
+						printf("--- selection str ---\n");
+						utf_destroy(tmp);
+					}
+                }break;
+
                 //handle ctrl v event
                 case OS_KEY_v:
                 case OS_KEY_V: {
@@ -1229,6 +1239,37 @@ TextCursor text_box_delete_range(TextBox* box, Selection selection)
 	box->need_to_render = true;
 
 	return new_cursor_pos;
+}
+
+UTFString* text_box_get_selection_str(TextBox* box, Selection selection)
+{
+	selection = normalize_selection(selection);
+
+	//if selection has the same text line at beginning and at the end
+	//just create str from sub sv	
+	if(selection.start_line_number == selection.end_line_number){
+		TextLine* line = get_line_from_line_number(box, selection.start_line_number);
+		UTFString* str = utf_from_sv(utf_sv_sub_str(line->str, selection.start_char, selection.end_char)); 
+		return str;
+	}
+
+	TextLine* start_line = get_line_from_line_number(box, selection.start_line_number); 
+	TextLine* end_line = get_line_from_line_number(box, selection.end_line_number); 
+	
+	UTFString* str = utf_from_sv(utf_sv_sub_str(start_line->str, selection.start_char, start_line->str->count));
+
+	//TODO : Implement some sort of mechanic to differentiate between crlf and lf
+	utf_append_cstr(str, u8"\n");
+
+	for(TextLine* line = start_line->next; line != NULL && line != end_line; line = line->next){
+		utf_append_str(str, line->str);
+		//TODO : Implement some sort of mechanic to differentiate between crlf and lf
+		utf_append_cstr(str, u8"\n");
+	}
+
+	utf_append_sv(str, utf_sv_sub_str(end_line->str, 0, selection.end_char));  
+
+	return str;
 }
 
 void text_box_resize(TextBox* box, int w, int h)
