@@ -21,7 +21,7 @@
 typedef struct OS
 {
     Display* display;
-    Window* window;
+    Window window;
     int screen;
     XIM xim;
     XIC xic;
