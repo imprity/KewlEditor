@@ -154,7 +154,19 @@ static bool virtual_key_to_os_keymod(uint64_t v_key, OS_Keymod* out_os_keymod)
 
 void os_set_ime_preedit_pos(int x, int y)
 {
-    return;
+    HIMC context = ImmGetContext(GLOBAL_OS->hwnd);
+
+    POINT point = { .x = x, .y = y };
+    //according to msdn when you set composition form's dwStyle to CFS_POINT, it only accounts for point
+    //I'm putting in rect just to be safe
+    RECT rect = { .left = x, .top = y, .right = x + GLOBAL_BOX->w, .bottom = y + GLOBAL_BOX->h };
+    COMPOSITIONFORM composition_form = {
+        .dwStyle = CFS_POINT,
+        .ptCurrentPos = point,
+        .rcArea = rect
+    };
+    ImmSetCompositionWindow(context, &composition_form);
+    ImmReleaseContext(GLOBAL_OS->hwnd,context);
 }
 
 OS_Keymod os_get_mod_state()
