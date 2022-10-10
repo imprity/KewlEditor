@@ -432,7 +432,7 @@ void text_box_handle_event(TextBox* box, OS_Event* event)
 	int cursor_pos_x, cursor_pos_y;
 	get_cursor_screen_pos(box, &cursor_pos_x, &cursor_pos_y);
 	int font_height = TTF_FontHeight(box->font);
-	os_set_ime_preedit_pos(cursor_pos_x, cursor_pos_y + font_height);
+	os_set_ime_preedit_pos(cursor_pos_x, cursor_pos_y + font_height + box->offset_y);
 }
 
 void update_text_line(TextBox* box, TextLine* line)
