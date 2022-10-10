@@ -161,9 +161,51 @@ OS_Keymod os_get_mod_state()
 {
     return GLOBAL_OS->key_mod;
 }
+
+size_t utf16_strlen(uint16_t* str) {
+    size_t len = 0;
+    while (str[len] != 0) {
+        len++;
+    }
+    
+    return len;
+}
+
 void os_request_text_paste()
 {
-    return;
+    //handle pasting event
+    //TOOD : This is probably not safe we should check if text is malicious or not
+
+    if (!IsClipboardFormatAvailable(CF_UNICODETEXT))
+        return;
+    if (!OpenClipboard(GLOBAL_OS->hwnd))
+        return;
+
+    HGLOBAL hglb = GetClipboardData(CF_UNICODETEXT);
+    if (hglb != NULL)
+    {
+        uint16_t *utf16_str = GlobalLock(hglb);
+        size_t utf16_size = utf16_strlen(utf16_str) + 1; //include null terminator
+        if (utf16_str != NULL)
+        {
+            uint8_t *utf8_str = NULL;
+            size_t utf8_str_size = 0;
+
+            utf16_to_8(utf16_str, utf16_size, utf8_str, &utf8_str_size);
+            utf8_str = malloc(utf8_str_size);
+            utf16_to_8(utf16_str, utf16_size, utf8_str, &utf8_str_size);
+
+            OS_TextPasteEvent paste_event = { .paste_sv = utf_sv_from_cstr(utf8_str) };
+            OS_Event wrapped_paste_event = { .text_paste_event = paste_event, .type = OS_TEXT_PASTE_EVENT };
+
+            text_box_handle_event(GLOBAL_BOX, &wrapped_paste_event);
+
+            GlobalUnlock(hglb);
+
+            free(utf8_str);
+        }
+    }
+    CloseClipboard();
 }
 
 UTFString* replace_lf_to_crlf(UTFStringView sv) {
