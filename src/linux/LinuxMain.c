@@ -249,7 +249,10 @@ void remove_contorl_characters(UTFString* str){
     size_t char_index = 0;
     while(char_index < str->count){
         UTFStringView sv = utf_sv_sub_str(str, char_index, char_index+1);
-        uint32_t char_code_at = utf8_to_32(sv.data, sv.data_size);
+        //uint32_t char_code_at = utf8_to_32(sv.data, sv.data_size);
+        uint32_t char_code_at = 0;
+        size_t size = 1;
+        utf8_to_32(sv.data, sv.data_size, &char_code_at, &size);
         if( ((char_code_at >= 0x0001 && char_code_at <=0x001f) || (char_code_at >= 0x007f && char_code_at <=0x009f)) && char_code_at != '\n'){
             utf_erase_range(str, char_index, char_index+1);
         }
@@ -564,7 +567,7 @@ int linux_main(TextBox* _box, int argc, char* argv[])
 
                     XSelectionRequestEvent selection_request = xevent.xselectionrequest;
 					XEvent reply;
-					
+
 					//Extract the relavent data
 					Window owner     = selection_request.owner;
 					Atom selection   = selection_request.selection;
