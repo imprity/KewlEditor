@@ -20,10 +20,18 @@ typedef struct TextLine{
     //TODO perhaps make vector for ints
     int wrapped_line_sizes[128];
 
+    /////////////////////////////
+    // !!!!!!!IMPORTANT!!!!!!!!!
+    // These values does not indicate whether or not str it self ends with crlf or lf
+    // TextLine str should not have crlf of lf at the end in the first place
+    /////////////////////////////
+    bool ends_with_crlf;
+    bool ends_with_lf;
+
     size_t line_number;
 } TextLine;
 
-TextLine* text_line_create(UTFString *str, size_t line_number);
+TextLine* text_line_create(UTFString* str, size_t line_number, bool ends_with_lf, bool ends_with_crlf);
 void text_line_destroy(TextLine* line);
 
 TextLine* text_line_first(TextLine* line);

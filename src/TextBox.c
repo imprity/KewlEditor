@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <assert.h>
 
+#pragma execution_character_set("utf-8")
+
 #define TEST_TEXT_ENGLISH (\
 "When danger makes me want to hide, you'll Rainbow Dash to my side\n"  \
 "Kindness is never in short supply, once smitten twice Fluttershy\n"   \
@@ -19,6 +21,7 @@ u8"종마다 다르지만 잘 익은 사과는 껍질이 벗겨지지 않은 상
 u8"\n"                                                                                                   \
 u8"야생 사과는 키르기스스탄과 중국 사이에 위치한 톈산 산맥과 타림 분지가 원산지로, 이후 전 세계에 퍼지게 되었다.\n"    \
 u8"참고로 다른 과일인 배와 복숭아도 같은 지역이 원산지이다.\n")
+
 
 #define MISSING_GLYPH "?"
 
@@ -113,7 +116,6 @@ void get_char_coord_from_cursor(
 	if (y) { *y = line->wrapped_line_count-1; }
 }
 
-//UTFString* replace_missing_glyph_with_char(UTFString* str, TTF_Font* font, UTFStringView replacement) {
 UTFString* replace_missing_glyph_with_char(UTFStringView sv, TTF_Font* font, UTFStringView replacement) {
 
 	size_t bit_offset = 0;
@@ -128,7 +130,10 @@ UTFString* replace_missing_glyph_with_char(UTFStringView sv, TTF_Font* font, UTF
 	for (size_t i = 0; i < sv.count; i++) {
 		//size_t next = utf_next(str, bit_offset);
 		size_t next = utf_sv_next(sv, bit_offset);
-		uint32_t codepoint = utf8_to_32(ptr + bit_offset, next - bit_offset);
+		uint32_t codepoint = 0;
+		size_t size = 1;
+		utf8_to_32(ptr + bit_offset, next - bit_offset, &codepoint, &size);
+		
 		if (!TTF_GlyphIsProvided32(font, codepoint)) {
 			utf_append_sv(copy, replacement);
 		}
@@ -265,11 +270,13 @@ void text_box_handle_event(TextBox* box, OS_Event* event)
         case OS_KEY_PRESS_EVENT: {
             OS_KeySym key = event->keyboard_event.key_sym;
             switch (key) {
+				//NOTE: previously we handled new line enter key in here but maybe we should handle it in text input event
                 case OS_KEY_ENTER: {
                     if (have_selection) {
                         box->cursor = text_box_delete_range(box, box->selection);
                     }
-                    box->cursor = text_box_type(box, box->cursor, utf_sv_from_cstr("\n"));
+                    //box->cursor = text_box_type(box, box->cursor, utf_sv_from_cstr("\n"));
+					box->cursor = text_box_type(box, box->cursor, utf_sv_from_cstr("\r\n"));
                     box->selection = set_selection_to_cursor(box->cursor);
                     if (!holding_shift) {
                         box->is_selecting = false;
@@ -553,18 +560,32 @@ void text_box_destroy(TextBox* box)
 
 TextCursor text_box_type(TextBox* box, TextCursor cursor, UTFStringView sv)
 {
+	TextLine* cursor_line = get_line_from_line_number(box, cursor.line_number);
+	TextCursor new_cursor_pos = cursor;
+
 	int new_line_index = utf_sv_find(sv, utf_sv_from_cstr(u8"\n"));
 	bool has_new_line = new_line_index >= 0;
 
-	//TextLine* cursor_line = get_cursor_line(box);
-	TextLine* cursor_line = get_line_from_line_number(box, cursor.line_number);
+	if (!has_new_line) {
+		size_t char_offset = cursor.char_offset;
+		utf_insert_sv(cursor_line->str, char_offset, sv);
+		update_text_line(box, cursor_line);
+		new_cursor_pos.char_offset = char_offset + sv.count;
+	}
+	else {
+		size_t afer_new_line_start = new_line_index + 1;
+		//check if new_line_index is actuall crlf
+		//and if it is move it left
+		if (new_line_index >= 1) {
+			if (utf_sv_cmp(utf_sv_sub_sv(sv, new_line_index - 1, new_line_index), utf_sv_from_cstr(u8"\r"))) {
+				new_line_index--;
+				afer_new_line_start = new_line_index + 2;
+			}
+		}
 
-	TextCursor new_cursor_pos = cursor;
-
-	if (has_new_line) {
 		//divide typed lines to before new line and after new line
 		UTFStringView before_new_line = utf_sv_sub_sv(sv, 0, new_line_index);
-		UTFStringView after_new_line = utf_sv_sub_sv(sv, new_line_index + 1, sv.count);
+		UTFStringView after_new_line = utf_sv_sub_sv(sv, afer_new_line_start, sv.count);
 
 		//create new sub string from original string that starts from insertion point
 		size_t insertion_point = cursor.char_offset;
@@ -579,23 +600,31 @@ TextCursor text_box_type(TextBox* box, TextCursor cursor, UTFStringView sv)
 
 		//create new text lines from after new line
 		TextLine* new_lines;
+		TextLine* new_lines_last;
 
 		if (after_new_line.count == 0) {
 			//if after_new_line is empty then new_lines is just after insertion
 			cursor_char_pos = 0;
-			new_lines = text_line_create(after_insertion, 0);
+			
+			//new lines follows inserted cursor line's new line ending
+			//NOTE : Maybe in this case it should follow os's convention
+			new_lines = text_line_create(after_insertion, 0, cursor_line->ends_with_lf, cursor_line->ends_with_crlf);
+			new_lines_last = new_lines;
 		}
 		else {
 			//else we create new lines from after_new_line and append after_insertion at the end
 			new_lines = create_lines_from_sv(after_new_line);
 			//text_line_push_back(new_lines, text_line_create(after_insertion, 0));
-			TextLine* new_lines_last = text_line_last(new_lines);
+			new_lines_last = text_line_last(new_lines);
 			cursor_char_pos = new_lines_last->str->count;
 			utf_append_cstr(new_lines_last->str, after_insertion->data);
 			utf_destroy(after_insertion);
-		}
 
-		TextLine* new_line_last = text_line_last(new_lines);
+			//new lines follows inserted cursor line's new line ending
+			new_lines_last->ends_with_crlf = cursor_line->ends_with_crlf;
+			new_lines_last->ends_with_lf = cursor_line->ends_with_lf;
+		}
+		
 		//update new lines
 		for (TextLine* line = new_lines; line != NULL; line = line->next) {
 			update_text_line(box, line);
@@ -607,15 +636,8 @@ TextCursor text_box_type(TextBox* box, TextCursor cursor, UTFStringView sv)
 		update_text_line(box, cursor_line);
 
 		//calulate cursor pos
-		new_cursor_pos.line_number = new_line_last->line_number;
+		new_cursor_pos.line_number = new_lines_last->line_number;
 		new_cursor_pos.char_offset = cursor_char_pos;
-	}
-	else {
-		//utf_append(box->cursor_line->str, c);
-		size_t char_offset = cursor.char_offset;
-		utf_insert_sv(cursor_line->str, char_offset, sv);
-		update_text_line(box, cursor_line);
-		new_cursor_pos.char_offset = char_offset + sv.count;
 	}
 
 	int font_height = TTF_FontHeight(box->font);
@@ -731,8 +753,8 @@ void text_box_render(TextBox* box) {
 		return;
 	}
 	//Clear render surface with bg color
-    SDL_FillRect(box->render_surface, NULL,
-        SDL_MapRGBA(box->render_surface->format, box->bg_color.r, box->bg_color.g, box->bg_color.b, box->bg_color.a));
+	SDL_FillRect(box->render_surface, NULL,
+		SDL_MapRGBA(box->render_surface->format, box->bg_color.r, box->bg_color.g, box->bg_color.b, box->bg_color.a)) ;
 
 	int font_height = TTF_FontHeight(box->font);
 

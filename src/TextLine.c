@@ -1,12 +1,16 @@
 #include "TextLine.h"
 #include <string.h>
 #include <stdlib.h>
+#include <assert.h>
 
-TextLine* text_line_create(UTFString *str, size_t line_number)
+TextLine* text_line_create(UTFString *str, size_t line_number, bool ends_with_lf, bool ends_with_crlf)
 {
     TextLine *line = malloc(sizeof(TextLine));
     line->prev = NULL;
     line->next = NULL;
+
+    line->ends_with_crlf = ends_with_crlf;
+    line->ends_with_lf = ends_with_lf;
 
     if (str == NULL) {
         line->str = utf_from_cstr(u8"");
@@ -128,7 +132,7 @@ void text_line_insert_right(TextLine* line, TextLine* to_insert)
 TextLine* create_lines_from_cstr(char *str)
 {
     if (str == NULL) {
-        return text_line_create(utf_from_cstr(NULL), 0);
+        return text_line_create(utf_from_cstr(NULL), 0, false, false);
     }
 
     UTFStringView sv = utf_sv_from_cstr(str);
@@ -144,7 +148,7 @@ TextLine* create_lines_from_str(UTFString* str)
 TextLine* create_lines_from_sv(UTFStringView sv)
 {
     if (sv.count == 0) {
-        return text_line_create(utf_from_sv(sv), 0);
+        return text_line_create(utf_from_sv(sv), 0, false, false);
     }
 
     TextLine* first = NULL;
@@ -153,30 +157,55 @@ TextLine* create_lines_from_sv(UTFStringView sv)
     size_t line_number = 0;
 
     while (sv.count != 0) {
-        int new_line_at = utf_sv_find(sv, utf_sv_from_cstr(u8"\n"));
+        int lf_at = utf_sv_find(sv, utf_sv_from_cstr(u8"\n"));
+        int crlf_at = utf_sv_find(sv, utf_sv_from_cstr(u8"\r\n"));
 
-        bool found_new_line = new_line_at >= 0;
+        bool ends_with_crlf = false;
+        bool ends_with_lf = false;
+
+        bool found_new_line = lf_at >= 0 || crlf_at >= 0;
+
+        size_t new_line_at = 0;
 
         if (!found_new_line) {
             new_line_at = sv.count;
+        }
+        else {
+            if(lf_at < 0 || (crlf_at < lf_at && crlf_at >= 0)){
+                new_line_at = crlf_at;
+                ends_with_crlf = true;
+            }
+            else{
+                new_line_at = lf_at;
+                ends_with_lf = true;
+            }
         }
 
         UTFStringView line = utf_sv_sub_sv(sv, 0, new_line_at);
         sv = utf_sv_trim_left(sv, new_line_at);
 
         if (found_new_line) {
-            sv = utf_sv_trim_left(sv, 1);
+            if (ends_with_crlf) {
+                sv = utf_sv_trim_left(sv, 2);
+            }
+            else if(ends_with_lf) {
+                sv = utf_sv_trim_left(sv, 1);
+            }
         }
 
         if (first == NULL) {
-            first = text_line_create(utf_from_sv(line), line_number++);
+            first = text_line_create(utf_from_sv(line), line_number++, ends_with_lf, ends_with_crlf);
             last = first;
         }
         else {
-            TextLine* to_push = text_line_create(utf_from_sv(line), line_number++);
+            TextLine* to_push = text_line_create(utf_from_sv(line), line_number++, ends_with_lf, ends_with_crlf);
             text_line_push_back(last, to_push);
             last = to_push;
         }
+    }
+    if (last->ends_with_crlf || last->ends_with_lf) {
+        TextLine* end = text_line_create(utf_from_cstr(""), line_number++, false, false);
+        text_line_push_back(last, end);
     }
 
     return first;
@@ -184,25 +213,73 @@ TextLine* create_lines_from_sv(UTFStringView sv)
 
 void text_line_test()
 {
-    TextLine* first = create_lines_from_cstr(
-        u8"This is long line of texts\n"
-        u8"To see if TextLine works\n"
-        u8"If it doesn't....\n"
-        u8"Then I guess we'll have to better..\n"
-        u8"If you don't want to see this Text\n"
-        u8"Comment the function \"text_line_text()\"\n"
-        u8"\n"
-        u8"\n"
-    );
+    {
+        TextLine* first = create_lines_from_cstr(
+            u8"line 1\n"
+            u8"line 2\r\n"
+            u8"line 3\n"
+        );
 
-    for (TextLine* line = first; line != NULL; line = line->next) {
-        printf("%zu : %s\n",line->line_number, line->str->data);
+        TextLine* tmp = first;
+
+        assert(utf_sv_cmp(utf_sv_from_str(tmp->str), utf_sv_from_cstr(u8"line 1")));
+        assert(tmp->ends_with_lf == true);
+        assert(tmp->ends_with_crlf == false);
+        assert(tmp->line_number == 0);
+        tmp = tmp->next;
+
+        assert(utf_sv_cmp(utf_sv_from_str(tmp->str), utf_sv_from_cstr(u8"line 2")));
+        assert(tmp->ends_with_lf == false);
+        assert(tmp->ends_with_crlf == true);
+        assert(tmp->line_number == 1);
+        tmp = tmp->next;
+
+        assert(utf_sv_cmp(utf_sv_from_str(tmp->str), utf_sv_from_cstr(u8"line 3")));
+        assert(tmp->ends_with_lf == true);
+        assert(tmp->ends_with_crlf == false);
+        assert(tmp->line_number == 2);
+        tmp = tmp->next;
+
+        assert(utf_sv_cmp(utf_sv_from_str(tmp->str), utf_sv_from_cstr(u8"")));
+        assert(tmp->ends_with_lf == false);
+        assert(tmp->ends_with_crlf == false);
+        assert(tmp->line_number == 3);
+        tmp = tmp->next;
+
+        tmp = first;
+
+        while (tmp != NULL) {
+            TextLine* next = tmp->next;
+            text_line_destroy(tmp);
+            tmp = next;
+        }
     }
+    {
+        TextLine* first = create_lines_from_cstr(
+            u8"line 1\n"
+            u8"line 2"
+        );
 
-    TextLine *tmp = first;
-    while(tmp != NULL){
-        TextLine* next = tmp->next;
-        text_line_destroy(tmp);
-        tmp = next;
+        TextLine* tmp = first;
+
+        assert(utf_sv_cmp(utf_sv_from_str(tmp->str), utf_sv_from_cstr(u8"line 1")));
+        assert(tmp->ends_with_lf == true);
+        assert(tmp->ends_with_crlf == false);
+        assert(tmp->line_number == 0);
+        tmp = tmp->next;
+
+        assert(utf_sv_cmp(utf_sv_from_str(tmp->str), utf_sv_from_cstr(u8"line 2")));
+        assert(tmp->ends_with_lf == false);
+        assert(tmp->ends_with_crlf == false);
+        assert(tmp->line_number == 1);
+        tmp = tmp->next;
+
+        tmp = first;
+
+        while (tmp != NULL) {
+            TextLine* next = tmp->next;
+            text_line_destroy(tmp);
+            tmp = next;
+        }
     }
 }

@@ -4,6 +4,9 @@
 #include <assert.h>
 #include <locale.h>
 
+//Please don't define main to something else SDL...
+#define SDL_MAIN_HANDLED
+
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 
@@ -16,8 +19,13 @@
 
 #include "TextBox.h"
 
-#include "linux/LinuxMain.h"
+#if _WIN32
+#include "windows/WindowsMain.h"
+#endif
 
+#if __linux__
+#include "linux/LinuxMain.h"
+#endif
 
 int main(int argc, char* argv[])
 {
@@ -68,7 +76,16 @@ int main(int argc, char* argv[])
 
     text_box_render(box);
 
-    int ret_val = linux_main(box, argc, argv);
+    int ret_val = 0;
+
+#if _WIN32
+    ret_val = windows_main(box, argc, argv);
+#endif
+
+#if __linux__
+    ret_val = linux_main(box, argc, argv);
+#endif
+
 
 cleanup :
     if (font)

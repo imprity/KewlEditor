@@ -23,7 +23,7 @@ if(UNIX)
 	list(APPEND SRCS "${SRC_DIR}/linux/LinuxMain.c" "${SRC_DIR}/linux/LinuxMain.h")
 endif()
 if(WIN32)
-	#TODO append windows main and library
+	list(APPEND SRCS "${SRC_DIR}/windows/WindowsMain.c" "${SRC_DIR}/windows/WindowsMain.h")
 endif()
 
 add_executable(KewlEditor ${SRCS}) 
@@ -36,7 +36,7 @@ if(UNIX)
 	target_include_directories(KewlEditor PRIVATE X11)
 endif()
 if(WIN32)
-	#TODO append windows main and library
+	#added if necessary
 endif()
 
 
@@ -72,7 +72,6 @@ if((NOT SDL2_FOUND) OR (NOT SDL2_ttf_FOUND))
 	#
 	#  SDL2_INCLUDE_DIR
 	#  SDL2_LIBRARY
-	#  SDL2MAIN_LIBRAY
 	#  
 	#  SDL2_TTF_INCLUDE_DIR
 	#  SDL2_TTF_LIBRARY
@@ -83,7 +82,8 @@ if((NOT SDL2_FOUND) OR (NOT SDL2_ttf_FOUND))
 	mark_as_advanced(CLEAR 
 		SDL2_INCLUDE_DIR
 		SDL2_LIBRARY
-
+		SDL2MAIN_LIBRARY
+		
 		SDL2_TTF_INCLUDE_DIR
 		SDL2_TTF_LIBRARY
 	)
@@ -91,13 +91,18 @@ endif()
 
 #link to sdl
 target_include_directories(KewlEditor PRIVATE ${SDL2_INCLUDE_DIR})
-#for ttf thing
+
 target_include_directories(KewlEditor PRIVATE "${SDL2_INCLUDE_DIR}/SDL2")
 target_link_libraries(KewlEditor "${SDL2_LIBRARY}")
 
 #and ttf
 target_include_directories(KewlEditor PRIVATE ${SDL2_TTF_INCLUDE_DIR})	
 target_link_libraries(KewlEditor ${SDL2_TTF_LIBRARY})
+
+#if msvc, then tell compiler to read sources as utf-8
+if(MSVC)
+	target_compile_options(KewlEditor PRIVATE "/utf-8")
+endif()
 
 #copy font to directory
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/NotoSansKR-Medium.otf" "${CMAKE_CURRENT_BINARY_DIR}/NotoSansKR-Medium.otf" COPYONLY)
