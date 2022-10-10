@@ -142,7 +142,7 @@ static bool virtual_key_to_os_keymod(uint64_t v_key, OS_Keymod* out_os_keymod)
     bool found_keymod = false;
     size_t keymod_arr_size = sizeof(VIRTUAL_KEY_TO_OS_KEYMOD) / sizeof(VIRTUAL_KEY_TO_OS_KEYMOD[0]);
     for (size_t i = 0; i < keymod_arr_size; i++) {
-        if (VIRTUAL_KEY_TO_OS_KEYMOD[i].v_key== v_key) {
+        if (VIRTUAL_KEY_TO_OS_KEYMOD[i].v_key == v_key) {
             *out_os_keymod = VIRTUAL_KEY_TO_OS_KEYMOD[i].os_keymod;
             found_keymod = true;
             break;
@@ -154,7 +154,6 @@ static bool virtual_key_to_os_keymod(uint64_t v_key, OS_Keymod* out_os_keymod)
 
 void os_set_ime_preedit_pos(int x, int y)
 {
-    VK_ACCEPT;
     return;
 }
 
@@ -166,8 +165,96 @@ void os_request_text_paste()
 {
     return;
 }
+
+UTFString* replace_lf_to_crlf(UTFStringView sv) {
+    size_t raw_size = 2;
+    while (raw_size < sv.data_size) {
+        raw_size *= 2;
+    }
+
+    uint8_t* data = malloc(raw_size);
+    size_t data_index = 0;
+
+    size_t replace_count = 0;
+
+    for (size_t i = 0; i < sv.data_size; i++) {
+        if (data_index + 1 >= raw_size) {
+            raw_size *= 2;
+            data = realloc(data, raw_size);
+        }
+
+        if (sv.data[i] == '\n' &&
+            ((i == 0) || (i >= 1 && sv.data[i - 1] != '\r'))
+            ) {
+            data[data_index++] = '\r';
+            data[data_index++] = '\n';
+
+            replace_count++;
+        }
+        else {
+            data[data_index++] = sv.data[i];
+        }
+    }
+
+    //null terminate
+    if (data_index >= raw_size) {
+        raw_size *= 2;
+        data = realloc(data, raw_size);
+    }
+    data[data_index++] = 0;
+
+    UTFString* ret_str = malloc(sizeof(UTFString));
+
+    ret_str->data = data;
+    ret_str->data_size = data_index;
+    ret_str->raw_size = raw_size;
+    ret_str->count = sv.count + replace_count;
+
+    return ret_str;
+}
+
 void os_set_clipboard_text(UTFStringView sv)
 {
+    if (!OpenClipboard(GLOBAL_OS->hwnd)) {
+        return;
+    }
+
+    EmptyClipboard();
+    // replace \n to \r\n
+    UTFString* copy = replace_lf_to_crlf(sv);
+
+    uint16_t* utf16_str = NULL;
+    size_t utf16_str_size = 0;
+
+    //we add one beacuse UTFString's data_size doesn't account null terminator
+    utf8_to_16(copy->data, copy->data_size + 1, utf16_str, &utf16_str_size);
+    utf16_str = malloc(utf16_str_size * sizeof(uint16_t));
+    utf8_to_16(copy->data, copy->data_size + 1, utf16_str, &utf16_str_size);
+
+    // Allocate a global memory object for the text. 
+
+    uint16_t* clipboard_str = GlobalAlloc(GMEM_MOVEABLE, utf16_str_size * sizeof(uint16_t));
+    if (clipboard_str == NULL)
+    {
+        CloseClipboard();
+        return FALSE;
+    }
+
+    // Lock the handle and copy the text to the buffer. 
+
+    LPTSTR  lock_copy = GlobalLock(clipboard_str);
+    memcpy(lock_copy, utf16_str, utf16_str_size * sizeof(uint16_t));
+    GlobalUnlock(clipboard_str);
+
+    // Place the handle on the clipboard. 
+
+    SetClipboardData(CF_UNICODETEXT, clipboard_str);
+
+    CloseClipboard();
+
+    //free memories
+    free(utf16_str);
+    utf_destroy(copy);
     return;
 }
 
@@ -191,15 +278,16 @@ UTFString* get_windows_system_error_str(DWORD error_code)
     //we are converting it to UTFString for convinience
     //also I'm kinda scared to move string outside of function scope that is allocated by something
     //other than malloc
-    UTFString *str = utf_from_cstr(lpMsgBuf);
-    
+    UTFString* str = utf_from_cstr(lpMsgBuf);
+
     LocalFree(lpMsgBuf);
     return str;
 }
 
-int windows_main(TextBox* _box,int argc, char* argv[])
+int windows_main(TextBox* _box, int argc, char* argv[])
 {
     GLOBAL_BOX = _box;
+
 
     OS _os = { 0 };
     GLOBAL_OS = &_os;
@@ -210,9 +298,9 @@ int windows_main(TextBox* _box,int argc, char* argv[])
     bool init_success = true;
 
     HINSTANCE hinstance = GetModuleHandle(NULL);
-    const wchar_t *class_name = L"Kewl Editor Class";
+    const wchar_t* class_name = L"Kewl Editor Class";
 
-    WNDCLASS wc = {0};
+    WNDCLASS wc = { 0 };
 
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = hinstance;
@@ -243,7 +331,7 @@ int windows_main(TextBox* _box,int argc, char* argv[])
     if (GLOBAL_OS->hwnd == NULL)
     {
         DWORD error_code = GetLastError();
-        UTFString *error_str =  get_windows_system_error_str(error_code);
+        UTFString* error_str = get_windows_system_error_str(error_code);
         fprintf(stderr, "%s:%d:ERROR: Failed to create window : %s\n", __FILE__, __LINE__, error_str->data);
         utf_destroy(error_str);
         init_success = false;
@@ -257,7 +345,7 @@ int windows_main(TextBox* _box,int argc, char* argv[])
 
     ShowWindow(GLOBAL_OS->hwnd, SW_SHOW);
 
-    MSG msg = {0};
+    MSG msg = { 0 };
 
     while (GetMessageW(&msg, NULL, 0, 0) > 0)
     {
@@ -274,163 +362,163 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)
     {
-        case WM_DESTROY:
-        {
-            PostQuitMessage(0);
-            return 0;
-        }break;
-        case WM_KEYUP:
-        case WM_KEYDOWN:
-        {
+    case WM_DESTROY:
+    {
+        PostQuitMessage(0);
+        return 0;
+    }break;
+    case WM_KEYUP:
+    case WM_KEYDOWN:
+    {
 
-            ////////////////////////
-            //handle key mod
-            ////////////////////////
-            OS_Keymod os_keymod = OS_KMOD_NONE;
+        ////////////////////////
+        //handle key mod
+        ////////////////////////
+        OS_Keymod os_keymod = OS_KMOD_NONE;
 
-            if (virtual_key_to_os_keymod(wParam, &os_keymod)) {
-                if (uMsg == WM_KEYDOWN) {
-                    GLOBAL_OS->key_mod |= os_keymod;
-                }
-                else {
-                    GLOBAL_OS->key_mod &= (~os_keymod);
-                }
-            }
-
-            ////////////////////////
-            //handle key sym event
-            ////////////////////////
-            OS_KeyboardEvent key_event;
-            key_event.pressed = uMsg == WM_KEYDOWN;
-
-            OS_KeySym os_keysym;
-
-            if (virtual_key_to_os_keysym(wParam, &os_keysym)) {
-                key_event.key_sym = os_keysym;
-                key_event.key_mode = GLOBAL_OS->key_mod;
-                OS_Event key_event_wraped;
-                key_event_wraped.type = uMsg == WM_KEYDOWN ? OS_KEY_PRESS_EVENT : OS_KEY_RELEASE_EVENT;
-                key_event_wraped.keyboard_event = key_event;
-
-                text_box_handle_event(GLOBAL_BOX, &key_event_wraped);
-            }
-            InvalidateRect(hwnd, NULL, FALSE);
-        }break;
-        
-        case WM_CHAR:
-        {
-            bool received_char = false;
-            
-            uint16_t utf16_str[3];
-            size_t utf16_size = 0;
-
-            if (IS_HIGH_SURROGATE(wParam)) {
-                GLOBAL_OS->pair_high = wParam;
-                GLOBAL_OS->received_pair_high = true;
-            }
-            else if (IS_LOW_SURROGATE(wParam)) {
-                GLOBAL_OS->pair_low = wParam;
-                GLOBAL_OS->received_pair_low = true;
-            }
-            else {    
-                //ignore non printable characters
-                //We are only removing control characters(https://www.compart.com/en/unicode/category/Cc)
-                //that ranges (u+0001 u+001f) (u+007f u+009F)
-                //except new line
-
-                //TODO : maybe check more rigorously
-                if(!((wParam >= 0x1 && wParam <= 0x1f) || (wParam >= 0x7f && wParam <= 0x9f)))
-                {
-                    utf16_str[0] = wParam;
-                    utf16_str[1] = 0;
-                    utf16_size = 2;
-                    received_char = true;
-                }
-            }
-
-            if (GLOBAL_OS->received_pair_high && GLOBAL_OS->received_pair_low) {
-                utf16_str[0] = GLOBAL_OS->pair_high;
-                utf16_str[1] = GLOBAL_OS->pair_low;
-                utf16_str[2] = 0;
-                utf16_size = 3;
-                received_char = true;
-                GLOBAL_OS->received_pair_high = false;
-                GLOBAL_OS->received_pair_low = false;
-            }
-
-            if (received_char) {
-                char utf8_buffer[8]; //in theory we only need 4 buffer at max but I'm scared
-
-                size_t str_size = 0;
-                //calculate str size
-                utf16_to_8(utf16_str, utf16_size, utf8_buffer, &str_size);
-                //and convert it
-                utf16_to_8(utf16_str, utf16_size, utf8_buffer, &str_size);
-
-                
-                OS_TextInputEvent input_event;
-                input_event.text_sv = utf_sv_from_cstr(utf8_buffer);
-
-                OS_Event input_event_wrapped = { .text_input_event = input_event, .type = OS_TEXT_INPUT_EVENT };
-                text_box_handle_event(GLOBAL_BOX, &input_event_wrapped);
-                //force window to redraw
-                InvalidateRect(hwnd, NULL, FALSE);
-            }
-            
-        }break;
-
-        case WM_PAINT:
-        {
-            
-            //render text box
-            text_box_render(GLOBAL_BOX);
-            
-            bool locked = false;
-            if (SDL_MUSTLOCK(GLOBAL_BOX->render_surface)) {
-                locked = true;
-                SDL_LockSurface(GLOBAL_BOX->render_surface);
-            }
-            HBITMAP bitmap = CreateBitmap(GLOBAL_BOX->w, GLOBAL_BOX->h, 1, 32, GLOBAL_BOX->render_surface->pixels);
-            if (locked) {
-                SDL_UnlockSurface(GLOBAL_BOX->render_surface);
-            }
-
-            if (!bitmap) {
-                fprintf(stderr, "%s:%d:ERROR: Failed to create bitmap\n", __FILE__, __LINE__);
+        if (virtual_key_to_os_keymod(wParam, &os_keymod)) {
+            if (uMsg == WM_KEYDOWN) {
+                GLOBAL_OS->key_mod |= os_keymod;
             }
             else {
-                PAINTSTRUCT ps;
-                HDC hdc = BeginPaint(hwnd, &ps);
-                HBITMAP  hOldBitmap;
-
-                HDC hMemDC = CreateCompatibleDC(hdc);
-                hOldBitmap = (HBITMAP)SelectObject(hMemDC, bitmap);
-
-                BitBlt(hdc, 0, 0, GLOBAL_BOX->w, GLOBAL_BOX->h, hMemDC, 0, 0, SRCCOPY);
-
-                SelectObject(hMemDC, hOldBitmap);
-                DeleteDC(hMemDC);
-
-                DeleteObject(bitmap);
-
-                EndPaint(hwnd, &ps);
+                GLOBAL_OS->key_mod &= (~os_keymod);
             }
-            return 0;
-        }break;
+        }
 
-        case WM_SIZE: {
-            UINT width = LOWORD(lParam);
-            UINT height = HIWORD(lParam);
-            text_box_resize(GLOBAL_BOX, width, height);
+        ////////////////////////
+        //handle key sym event
+        ////////////////////////
+        OS_KeyboardEvent key_event;
+        key_event.pressed = uMsg == WM_KEYDOWN;
 
+        OS_KeySym os_keysym;
+
+        if (virtual_key_to_os_keysym(wParam, &os_keysym)) {
+            key_event.key_sym = os_keysym;
+            key_event.key_mode = GLOBAL_OS->key_mod;
+            OS_Event key_event_wraped;
+            key_event_wraped.type = uMsg == WM_KEYDOWN ? OS_KEY_PRESS_EVENT : OS_KEY_RELEASE_EVENT;
+            key_event_wraped.keyboard_event = key_event;
+
+            text_box_handle_event(GLOBAL_BOX, &key_event_wraped);
+        }
+        InvalidateRect(hwnd, NULL, FALSE);
+    }break;
+
+    case WM_CHAR:
+    {
+        bool received_char = false;
+
+        uint16_t utf16_str[3];
+        size_t utf16_size = 0;
+
+        if (IS_HIGH_SURROGATE(wParam)) {
+            GLOBAL_OS->pair_high = wParam;
+            GLOBAL_OS->received_pair_high = true;
+        }
+        else if (IS_LOW_SURROGATE(wParam)) {
+            GLOBAL_OS->pair_low = wParam;
+            GLOBAL_OS->received_pair_low = true;
+        }
+        else {
+            //ignore non printable characters
+            //We are only removing control characters(https://www.compart.com/en/unicode/category/Cc)
+            //that ranges (u+0001 u+001f) (u+007f u+009F)
+            //except new line
+
+            //TODO : maybe check more rigorously
+            if (!((wParam >= 0x1 && wParam <= 0x1f) || (wParam >= 0x7f && wParam <= 0x9f)))
+            {
+                utf16_str[0] = wParam;
+                utf16_str[1] = 0;
+                utf16_size = 2;
+                received_char = true;
+            }
+        }
+
+        if (GLOBAL_OS->received_pair_high && GLOBAL_OS->received_pair_low) {
+            utf16_str[0] = GLOBAL_OS->pair_high;
+            utf16_str[1] = GLOBAL_OS->pair_low;
+            utf16_str[2] = 0;
+            utf16_size = 3;
+            received_char = true;
+            GLOBAL_OS->received_pair_high = false;
+            GLOBAL_OS->received_pair_low = false;
+        }
+
+        if (received_char) {
+            char utf8_buffer[8]; //in theory we only need 4 buffer at max but I'm scared
+
+            size_t str_size = 0;
+            //calculate str size
+            utf16_to_8(utf16_str, utf16_size, utf8_buffer, &str_size);
+            //and convert it
+            utf16_to_8(utf16_str, utf16_size, utf8_buffer, &str_size);
+
+
+            OS_TextInputEvent input_event;
+            input_event.text_sv = utf_sv_from_cstr(utf8_buffer);
+
+            OS_Event input_event_wrapped = { .text_input_event = input_event, .type = OS_TEXT_INPUT_EVENT };
+            text_box_handle_event(GLOBAL_BOX, &input_event_wrapped);
             //force window to redraw
             InvalidateRect(hwnd, NULL, FALSE);
-        }break;
+        }
 
-        default:
-        {
-            return DefWindowProcW(hwnd, uMsg, wParam, lParam);
-        }break;
+    }break;
+
+    case WM_PAINT:
+    {
+
+        //render text box
+        text_box_render(GLOBAL_BOX);
+
+        bool locked = false;
+        if (SDL_MUSTLOCK(GLOBAL_BOX->render_surface)) {
+            locked = true;
+            SDL_LockSurface(GLOBAL_BOX->render_surface);
+        }
+        HBITMAP bitmap = CreateBitmap(GLOBAL_BOX->w, GLOBAL_BOX->h, 1, 32, GLOBAL_BOX->render_surface->pixels);
+        if (locked) {
+            SDL_UnlockSurface(GLOBAL_BOX->render_surface);
+        }
+
+        if (!bitmap) {
+            fprintf(stderr, "%s:%d:ERROR: Failed to create bitmap\n", __FILE__, __LINE__);
+        }
+        else {
+            PAINTSTRUCT ps;
+            HDC hdc = BeginPaint(hwnd, &ps);
+            HBITMAP  hOldBitmap;
+
+            HDC hMemDC = CreateCompatibleDC(hdc);
+            hOldBitmap = (HBITMAP)SelectObject(hMemDC, bitmap);
+
+            BitBlt(hdc, 0, 0, GLOBAL_BOX->w, GLOBAL_BOX->h, hMemDC, 0, 0, SRCCOPY);
+
+            SelectObject(hMemDC, hOldBitmap);
+            DeleteDC(hMemDC);
+
+            DeleteObject(bitmap);
+
+            EndPaint(hwnd, &ps);
+        }
+        return 0;
+    }break;
+
+    case WM_SIZE: {
+        UINT width = LOWORD(lParam);
+        UINT height = HIWORD(lParam);
+        text_box_resize(GLOBAL_BOX, width, height);
+
+        //force window to redraw
+        InvalidateRect(hwnd, NULL, FALSE);
+    }break;
+
+    default:
+    {
+        return DefWindowProcW(hwnd, uMsg, wParam, lParam);
+    }break;
     }
     return 0;
 }
