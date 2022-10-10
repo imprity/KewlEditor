@@ -36,7 +36,7 @@ if(UNIX)
 	target_include_directories(KewlEditor PRIVATE X11)
 endif()
 if(WIN32)
-	#added if necessary
+	target_link_libraries(KewlEditor "Imm32.lib")
 endif()
 
 
