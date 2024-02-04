@@ -40,12 +40,16 @@ bool sv_fits(UTFStringView sv, TTF_Font* font, int w, size_t* text_count, int* t
 
 	int measured_count = 0;
 	int measured_width = 0;
-	bool fits = true;
 
+	/*
 	char tmp = sv.data[sv.data_size];
 	sv.data[sv.data_size] = 0;
 	TTF_MeasureUTF8(font, sv.data, w, &measured_width, &measured_count);
 	sv.data[sv.data_size] = tmp;
+	*/
+	UTFString *tmp = utf_from_sv(sv);
+	TTF_MeasureUTF8(font, tmp->data, w, &measured_width, &measured_count);
+	utf_destroy(tmp);
 
 	if (text_count) {
 		*text_count = measured_count;
@@ -54,7 +58,7 @@ bool sv_fits(UTFStringView sv, TTF_Font* font, int w, size_t* text_count, int* t
 		*text_width = measured_width;
 	}
 
-	return sv.count == measured_count;
+	return sv.count == (size_t)measured_count;
 }
 
 TextLine* get_line_from_line_number(TextBox* box, size_t line_number) {
@@ -119,7 +123,7 @@ void get_char_coord_from_cursor(
 UTFString* replace_missing_glyph_with_char(UTFStringView sv, TTF_Font* font, UTFStringView replacement) {
 
 	size_t bit_offset = 0;
-	size_t ptr = sv.data;
+	const char *ptr = sv.data;
 
 	UTFString* copy = utf_from_cstr("");
 
@@ -381,7 +385,7 @@ void text_box_handle_event(TextBox* box, OS_Event* event)
                 }break;
 
                 case OS_KEY_F3: {
-					if(has_selection){
+					if(have_selection){
 						UTFString *tmp = text_box_get_selection_str(box, box->selection);
 						printf("--- selection str ---\n");
 						utf_sv_fprintln(utf_sv_from_str(tmp), stdout);
@@ -412,6 +416,7 @@ void text_box_handle_event(TextBox* box, OS_Event* event)
 						}
                     }
                 }break;
+				default : { /*pass*/ } break;
             }
         }break;
         case OS_TEXT_PASTE_EVENT:
@@ -426,6 +431,7 @@ void text_box_handle_event(TextBox* box, OS_Event* event)
             }
             box->offset_y = calculate_new_box_offset_y(box, box->cursor);
         }break;
+		default : { /*pass*/ } break;
 	}
 
 	//update cursor pos
@@ -688,18 +694,18 @@ bool draw_sv(
 		return true;
 	}
 	SDL_Surface* surface;
-	char tmp = sv.data[sv.data_size];
-	sv.data[sv.data_size] = 0;
+	UTFString *tmp = utf_from_sv(sv);
 
 	if (!shaded) {
-		//surface = TTF_RenderUTF8_Blended(box->font, sv.data, text_color);
-		surface = TTF_RenderUTF8_LCD(box->font, sv.data, text_color, box->bg_color);
+		//surface = TTF_RenderUTF8_LCD(box->font, sv.data, text_color, box->bg_color);
+		surface = TTF_RenderUTF8_Shaded(box->font, tmp->data, text_color, box->bg_color);
 	}
 	else {
-		surface = TTF_RenderUTF8_LCD(box->font, sv.data, fg_color, bg_color);
+		//surface = TTF_RenderUTF8_LCD(box->font, sv.data, fg_color, bg_color);
+		surface = TTF_RenderUTF8_Shaded(box->font, tmp->data, fg_color, bg_color);
 	}
 
-	sv.data[sv.data_size] = tmp;
+	utf_destroy(tmp);
 
 	if (!surface) {
 		fprintf(stderr, "%s:%d:ERROR : Failed to create a surface for text box\n", __FILE__, __LINE__);
@@ -760,8 +766,8 @@ void text_box_render(TextBox* box) {
 
 	bool no_selection = !box->is_selecting;
 	no_selection = no_selection ||
-		box->selection.start_line_number == box->selection.end_line_number &&
-		box->selection.start_char == box->selection.end_char;
+		(box->selection.start_line_number == box->selection.end_line_number &&
+		box->selection.start_char == box->selection.end_char);
 
 	Selection selection = normalize_selection(box->selection);
 
@@ -1029,7 +1035,7 @@ size_t get_char_offset_from_line_and_char_coord(TextLine* line, size_t char_x, s
 		char_offset += line->wrapped_line_sizes[i];
 	}
 	size_t cursor_line_index = min(line->wrapped_line_count-1, char_y);
-	size_t cursor_line_size = min(char_x, line->wrapped_line_sizes[cursor_line_index]);
+	size_t cursor_line_size = min((int)char_x, line->wrapped_line_sizes[cursor_line_index]);
 	char_offset += cursor_line_size;
 	return char_offset;
 }
@@ -1059,7 +1065,7 @@ TextCursor text_box_move_cursor_up(TextBox* box, TextCursor cursor)
 		}
 	}
 	else {
-		if (cursor_line->wrapped_line_sizes[offset_y] == offset_x) {
+		if (cursor_line->wrapped_line_sizes[offset_y] == (int)offset_x) {
 			new_cursor_pos.place_after_last_char_before_wrapping = true;
 		}
 		else {

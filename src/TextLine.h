@@ -46,7 +46,7 @@ void text_line_push_front(TextLine* line, TextLine* to_push);
 void text_line_insert_left(TextLine* line, TextLine* to_insert);
 void text_line_insert_right(TextLine* line, TextLine* to_insert);
 
-TextLine* create_lines_from_cstr(char *str);
+TextLine* create_lines_from_cstr(const char *str);
 TextLine* create_lines_from_str(UTFString* str);
 TextLine* create_lines_from_sv(UTFStringView sv);
 

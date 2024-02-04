@@ -26,8 +26,8 @@ typedef struct OS
     XIM xim;
     XIC xic;
     OS_Keymod key_mod;
-    size_t window_width;
-    size_t window_height;
+    int window_width;
+    int window_height;
     UTFString* clipboard_paste_text;
     UTFString* clipboard_copy_text;
 } OS;
@@ -42,6 +42,7 @@ TextBox* GLOBAL_BOX;
 Atom WM_QUIT_ATOM = None;
 Atom CLIPBOARD_ATOM = None;
 Atom UTF8_ATOM = None;
+Atom TARGETS_ATOM = None;
 
 
 ///////////////////
@@ -262,8 +263,11 @@ void remove_contorl_characters(UTFString* str){
     }
 }
 
-int linux_main(TextBox* _box, int argc, char* argv[])
-{
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+int linux_main(TextBox* _box, int argc, char* argv[]) {
+#pragma GCC diagnostic pop
+
     GLOBAL_BOX = _box;
 
     bool init_success = true;
@@ -355,6 +359,12 @@ int linux_main(TextBox* _box, int argc, char* argv[])
         init_success = false;
     }
 
+	TARGETS_ATOM = XInternAtom(GLOBAL_OS->display, "TARGETS", false);
+    if(TARGETS_ATOM == None){
+        fprintf(stderr, "%s:%d:Failed to get targets atom\n", __FILE__, __LINE__);
+        init_success = false;
+    }
+
 
     //TODO : For now we use char_buffer and tmp_str to store and parse string that came from xlib event
     //But I think we can handle it using only tmp_str
@@ -401,9 +411,9 @@ int linux_main(TextBox* _box, int argc, char* argv[])
                         ximage = XCreateImage(GLOBAL_OS->display, DefaultVisual(GLOBAL_OS->display, GLOBAL_OS->screen), DefaultDepth(GLOBAL_OS->display, GLOBAL_OS->screen),
                                  ZPixmap, 0, GLOBAL_BOX->render_surface->pixels, GLOBAL_BOX->w, GLOBAL_BOX->h, 32, 0);
                     }
-                }
-                case KeyRelease:
-                case KeyPress:
+                } break ;
+                case KeyRelease: __attribute__ ((fallthrough));
+                case KeyPress: 
                 {
                     //KeySym ksym = XK_VoidSymbol;
                     KeySym ksym;
@@ -481,8 +491,7 @@ int linux_main(TextBox* _box, int argc, char* argv[])
                             text_box_handle_event(GLOBAL_BOX, &input_event_wrapped);
                         }
                     }
-
-                }
+                } break;
 
                 case Expose:
                 {
@@ -498,12 +507,11 @@ int linux_main(TextBox* _box, int argc, char* argv[])
                     if(locked){
                         SDL_UnlockSurface(GLOBAL_BOX->render_surface);
                     }
-                }
-                break;
+                } break;
 
                 case ClientMessage:
                 {
-                    if(xevent.xclient.data.l[0] == WM_QUIT_ATOM)
+                    if((Atom)xevent.xclient.data.l[0] == WM_QUIT_ATOM)
                     {
                         OS_Event quit_event = {.type = OS_QUIT_EVENT};
                         text_box_handle_event(GLOBAL_BOX, &quit_event);
@@ -545,7 +553,7 @@ int linux_main(TextBox* _box, int argc, char* argv[])
                         //we won't try to pass anything unless it's utf8
                         //TODO : Maybe try to parse thing if format is different
                         if(actual_type == UTF8_ATOM){
-                            utf_set_cstr(GLOBAL_OS->clipboard_paste_text, ret);
+                            utf_set_cstr(GLOBAL_OS->clipboard_paste_text, (char *)ret);
 
                             remove_contorl_characters(GLOBAL_OS->clipboard_paste_text);
 
@@ -569,7 +577,6 @@ int linux_main(TextBox* _box, int argc, char* argv[])
 					XEvent reply;
 
 					//Extract the relavent data
-					Window owner     = selection_request.owner;
 					Atom selection   = selection_request.selection;
 					Atom target      = selection_request.target;
 					Atom property    = selection_request.property;
@@ -586,16 +593,28 @@ int linux_main(TextBox* _box, int argc, char* argv[])
 					reply.xselection.property  = None;   //This means refusal
 					reply.xselection.time      = timestamp;
 
-					if(selection_request.target == UTF8_ATOM){
+					if(selection_request.target == UTF8_ATOM && selection_request.property != None){
 						printf("Got utf8\n");
 						reply.xselection.property = property;
 						XChangeProperty(display, requestor, property, target, 8, PropModeReplace,
-								GLOBAL_OS->clipboard_copy_text->data, GLOBAL_OS->clipboard_copy_text->data_size+1);
+								(unsigned char *)GLOBAL_OS->clipboard_copy_text->data, GLOBAL_OS->clipboard_copy_text->data_size);
 					}
+					else if (selection_request.target == TARGETS_ATOM && selection_request.property != None){
+						printf("Got targets\n");
+						reply.xselection.property = property;
 
+						Atom supported_targets[] = {UTF8_ATOM};
+
+						XChangeProperty(display, requestor, property, 
+							target, 32, PropModeReplace, (unsigned char *)supported_targets, 1);
+					}
 					else
 					{
-						printf("No valid conversion. Replying with refusal.\n");
+						//else get atom name for the target
+						char *atomName = XGetAtomName(display, selection_request.target);
+						printf("Expected utf8 but got %s. Replying with refusal.\n", atomName);
+						XFree(atomName);
+						//printf("No valid conversion. Replying with refusal.\n");
 					}
 
 					//Reply

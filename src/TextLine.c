@@ -129,7 +129,7 @@ void text_line_insert_right(TextLine* line, TextLine* to_insert)
     }
 }
 
-TextLine* create_lines_from_cstr(char *str)
+TextLine* create_lines_from_cstr(const char *str)
 {
     if (str == NULL) {
         return text_line_create(utf_from_cstr(NULL), 0, false, false);
