@@ -1,5 +1,5 @@
 CC := gcc
-CFLAGS := -Wall -Wextra
+CFLAGS :=  -Wall -Wextra -g -O3
 EXECUTABLE := ./build/KewlEditor
 SRC_FILES := ./src/main.c \
 			 ./src/linux/LinuxMain.c \

@@ -41,24 +41,35 @@ bool sv_fits(UTFStringView sv, TTF_Font* font, int w, size_t* text_count, int* t
 	int measured_count = 0;
 	int measured_width = 0;
 
-	/*
-	char tmp = sv.data[sv.data_size];
-	sv.data[sv.data_size] = 0;
-	TTF_MeasureUTF8(font, sv.data, w, &measured_width, &measured_count);
-	sv.data[sv.data_size] = tmp;
-	*/
-	UTFString *tmp = utf_from_sv(sv);
-	TTF_MeasureUTF8(font, tmp->data, w, &measured_width, &measured_count);
-	utf_destroy(tmp);
+    bool fits = true;
 
-	if (text_count) {
-		*text_count = measured_count;
-	}
-	if (text_width) {
-		*text_width = measured_width;
-	}
+	for (size_t i = 1; i <= sv.count; i++)
+    {
+        int tmp_width = 0;
 
-	return sv.count == (size_t)measured_count;
+        UTFString *sub_str = utf_sub_sv(sv, 0, i);
+
+        int res = TTF_SizeUTF8(font, sub_str->data, &tmp_width, NULL);
+
+        utf_destroy(sub_str);
+
+        if (res == -1){
+			fprintf(stderr, "%s:%d:ERROR : Failed to get a size of text : %s\n", __FILE__, __LINE__, TTF_GetError());
+        }
+
+        if (tmp_width <= w){
+            measured_count = i;
+            measured_width = tmp_width;
+        }else{
+            fits = false;
+            break;
+        }
+    }
+
+	if (text_count) { *text_count = measured_count; }
+	if (text_width) { *text_width = measured_width; }
+
+    return fits;
 }
 
 TextLine* get_line_from_line_number(TextBox* box, size_t line_number) {
@@ -137,7 +148,7 @@ UTFString* replace_missing_glyph_with_char(UTFStringView sv, TTF_Font* font, UTF
 		uint32_t codepoint = 0;
 		size_t size = 1;
 		utf8_to_32(ptr + bit_offset, next - bit_offset, &codepoint, &size);
-		
+
 		if (!TTF_GlyphIsProvided32(font, codepoint)) {
 			utf_append_sv(copy, replacement);
 		}
@@ -611,7 +622,7 @@ TextCursor text_box_type(TextBox* box, TextCursor cursor, UTFStringView sv)
 		if (after_new_line.count == 0) {
 			//if after_new_line is empty then new_lines is just after insertion
 			cursor_char_pos = 0;
-			
+
 			//new lines follows inserted cursor line's new line ending
 			//NOTE : Maybe in this case it should follow os's convention
 			new_lines = text_line_create(after_insertion, 0, cursor_line->ends_with_lf, cursor_line->ends_with_crlf);
@@ -630,7 +641,7 @@ TextCursor text_box_type(TextBox* box, TextCursor cursor, UTFStringView sv)
 			new_lines_last->ends_with_crlf = cursor_line->ends_with_crlf;
 			new_lines_last->ends_with_lf = cursor_line->ends_with_lf;
 		}
-		
+
 		//update new lines
 		for (TextLine* line = new_lines; line != NULL; line = line->next) {
 			update_text_line(box, line);
@@ -1289,16 +1300,16 @@ UTFString* text_box_get_selection_str(TextBox* box, Selection selection)
 	selection = normalize_selection(selection);
 
 	//if selection has the same text line at beginning and at the end
-	//just create str from sub sv	
+	//just create str from sub sv
 	if(selection.start_line_number == selection.end_line_number){
 		TextLine* line = get_line_from_line_number(box, selection.start_line_number);
-		UTFString* str = utf_from_sv(utf_sv_sub_str(line->str, selection.start_char, selection.end_char)); 
+		UTFString* str = utf_from_sv(utf_sv_sub_str(line->str, selection.start_char, selection.end_char));
 		return str;
 	}
 
-	TextLine* start_line = get_line_from_line_number(box, selection.start_line_number); 
-	TextLine* end_line = get_line_from_line_number(box, selection.end_line_number); 
-	
+	TextLine* start_line = get_line_from_line_number(box, selection.start_line_number);
+	TextLine* end_line = get_line_from_line_number(box, selection.end_line_number);
+
 	UTFString* str = utf_from_sv(utf_sv_sub_str(start_line->str, selection.start_char, start_line->str->count));
 
 	//TODO : Implement some sort of mechanic to differentiate between crlf and lf
@@ -1310,7 +1321,7 @@ UTFString* text_box_get_selection_str(TextBox* box, Selection selection)
 		utf_append_cstr(str, u8"\n");
 	}
 
-	utf_append_sv(str, utf_sv_sub_str(end_line->str, 0, selection.end_char));  
+	utf_append_sv(str, utf_sv_sub_str(end_line->str, 0, selection.end_char));
 
 	return str;
 }
