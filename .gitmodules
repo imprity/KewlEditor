@@ -1,6 +1,0 @@
-[submodule "cmake/sdl2"]
-	path = cmake/sdl2
-	url = https://gitlab.com/aminosbh/sdl2-cmake-modules.git
-[submodule "UTF8String"]
-	path = UTF8String
-	url = https://github.com/imprity/UTF8String
