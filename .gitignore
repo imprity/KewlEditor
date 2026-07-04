@@ -1,6 +1,7 @@
 build/
 
 build_win_x64/
+build_win_x86/
 
 *.obj
 
