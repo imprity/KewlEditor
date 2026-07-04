@@ -4,6 +4,7 @@ setlocal EnableDelayedExpansion
 
 set ARCH=x64
 set PRINT_HELP=0
+set BUILD_MODE=release
 
 rem argument parsing
 for %%x in (%*) do (
@@ -28,12 +29,24 @@ for %%x in (%*) do (
     if "%%~x"=="--x64" (
         set ARCH=x64
     )
+
+    rem parse build mode flags
+    if "%%~x"=="--debug" (
+        set BUILD_MODE=debug
+    )
+    if "%%~x"=="--release" (
+        set BUILD_MODE=release
+    )
 )
 
 if %PRINT_HELP%==1 (
     echo --help : prints this message
+    echo.
     echo --x86 : build for x86
     echo --x64 : build for x64
+    echo.
+    echo --debug : build for debug
+    echo --release : build for release
     exit /b 1
 )
 
@@ -56,12 +69,22 @@ set "FLAGS=%FLAGS% /experimental:external"
 set "FLAGS=%FLAGS% /external:W0"
 set "FLAGS=%FLAGS% /FeKewlEditor.exe"
 set "FLAGS=%FLAGS% /Foobj_files\"
+
+if %BUILD_MODE%==debug (
+    set "FLAGS=!FLAGS! /Zi /Od /RTC1"
+)
+if %BUILD_MODE%==release (
+    set "FLAGS=!FLAGS! /O2"
+)
+
 set "FLAGS=%FLAGS% .\src\*.c .\src\windows\*.c .\UTF8String\*.c"
 set "FLAGS=%FLAGS% /IUTF8String"
 set "FLAGS=%FLAGS% /external:Ithirdparty_windows\SDL2-2.32.8\"
 set "FLAGS=%FLAGS% /external:Ithirdparty_windows\SDL2_ttf-2.24.0\"
 set "FLAGS=%FLAGS% /external:Ithirdparty_windows\SDL2-2.32.8\SDL2"
 set "FLAGS=%FLAGS% /external:Ithirdparty_windows\SDL2_ttf-2.24.0\SDL2"
+
+rem LINKer options
 set "FLAGS=%FLAGS% /link"
 
 rem add lib according to architecture
@@ -91,6 +114,10 @@ mkdir "%BUILD_DIR%"
 
 copy /Y KewlEditor.exe "%BUILD_DIR%\KewlEditor.exe"
 copy /Y NotoSansKR-Medium.otf "%BUILD_DIR%\NotoSansKR-Medium.otf"
+
+if %BUILD_MODE%==debug (
+    copy /Y KewlEditor.pdb "%BUILD_DIR%\KewlEditor.pdb"
+)
 
 if %ARCH%==x64 (
     copy /Y thirdparty_windows\SDL2-2.32.8\lib\x64\SDL2.dll "%BUILD_DIR%\SDL2.dll"
