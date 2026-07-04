@@ -5,6 +5,7 @@
 #include "WindowsMain.h"
 #include "../OS.h"
 #include "../TextBox.h"
+#include "../Util.h"
 
 typedef struct OS
 {
@@ -102,7 +103,7 @@ static const struct
     OS_Keymod os_keymod;
 } VIRTUAL_KEY_TO_OS_KEYMOD[] =
 {
-    {NULL, OS_KMOD_NONE},
+    {0, OS_KMOD_NONE},
 
     {VK_LSHIFT, OS_KMOD_LSHIFT},
     {VK_RSHIFT, OS_KMOD_RSHIFT},
@@ -179,7 +180,7 @@ size_t utf16_strlen(uint16_t* str) {
     while (str[len] != 0) {
         len++;
     }
-    
+
     return len;
 }
 
@@ -200,7 +201,7 @@ void os_request_text_paste()
         size_t utf16_size = utf16_strlen(utf16_str) + 1; //include null terminator
         if (utf16_str != NULL)
         {
-            uint8_t *utf8_str = NULL;
+            char *utf8_str = NULL;
             size_t utf8_str_size = 0;
 
             utf16_to_8(utf16_str, utf16_size, utf8_str, &utf8_str_size);
@@ -259,7 +260,7 @@ UTFString* replace_lf_to_crlf(UTFStringView sv) {
 
     UTFString* ret_str = malloc(sizeof(UTFString));
 
-    ret_str->data = data;
+    ret_str->data = (char *) data;
     ret_str->data_size = data_index;
     ret_str->raw_size = raw_size;
     ret_str->count = sv.count + replace_count;
@@ -285,22 +286,22 @@ void os_set_clipboard_text(UTFStringView sv)
     utf16_str = malloc(utf16_str_size * sizeof(uint16_t));
     utf8_to_16(copy->data, copy->data_size + 1, utf16_str, &utf16_str_size);
 
-    // Allocate a global memory object for the text. 
+    // Allocate a global memory object for the text.
 
     uint16_t* clipboard_str = GlobalAlloc(GMEM_MOVEABLE, utf16_str_size * sizeof(uint16_t));
     if (clipboard_str == NULL)
     {
         CloseClipboard();
-        return FALSE;
+        return;
     }
 
-    // Lock the handle and copy the text to the buffer. 
+    // Lock the handle and copy the text to the buffer.
 
     LPTSTR  lock_copy = GlobalLock(clipboard_str);
     memcpy(lock_copy, utf16_str, utf16_str_size * sizeof(uint16_t));
     GlobalUnlock(clipboard_str);
 
-    // Place the handle on the clipboard. 
+    // Place the handle on the clipboard.
 
     SetClipboardData(CF_UNICODETEXT, clipboard_str);
 
@@ -316,7 +317,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 UTFString* get_windows_system_error_str(DWORD error_code)
 {
-    LPVOID* lpMsgBuf;
+    LPSTR lpMsgBuf = NULL;
 
     //get error message formatted in ascii
     FormatMessageA(
@@ -326,7 +327,7 @@ UTFString* get_windows_system_error_str(DWORD error_code)
         NULL,
         error_code,
         1033, //english_language_id defined at https://learn.microsoft.com/en-us/openspecs/office_standards/ms-oe376/db9b9b72-b10b-4e7e-844c-09f88c972219
-        (LPSTR)&lpMsgBuf,
+        lpMsgBuf,
         0, NULL);
 
     //we are converting it to UTFString for convinience
@@ -340,6 +341,9 @@ UTFString* get_windows_system_error_str(DWORD error_code)
 
 int windows_main(TextBox* _box, int argc, char* argv[])
 {
+    UNUSED(argc);
+    UNUSED(argv);
+
     GLOBAL_BOX = _box;
 
 
@@ -354,7 +358,7 @@ int windows_main(TextBox* _box, int argc, char* argv[])
     HINSTANCE hinstance = GetModuleHandle(NULL);
     const wchar_t* class_name = L"Kewl Editor Class";
 
-    WNDCLASS wc = { 0 };
+    WNDCLASSW wc = { 0 };
 
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = hinstance;
@@ -394,8 +398,6 @@ int windows_main(TextBox* _box, int argc, char* argv[])
     if (!init_success) {
         goto cleanup;
     }
-
-    WINDOWINFO info;
 
     ShowWindow(GLOBAL_OS->hwnd, SW_SHOW);
 
@@ -467,11 +469,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         size_t utf16_size = 0;
 
         if (IS_HIGH_SURROGATE(wParam)) {
-            GLOBAL_OS->pair_high = wParam;
+            GLOBAL_OS->pair_high = (uint16_t) wParam;
             GLOBAL_OS->received_pair_high = true;
         }
         else if (IS_LOW_SURROGATE(wParam)) {
-            GLOBAL_OS->pair_low = wParam;
+            GLOBAL_OS->pair_low = (uint16_t) wParam;
             GLOBAL_OS->received_pair_low = true;
         }
         else {
@@ -483,7 +485,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             //TODO : maybe check more rigorously
             if (!((wParam >= 0x1 && wParam <= 0x1f) || (wParam >= 0x7f && wParam <= 0x9f)))
             {
-                utf16_str[0] = wParam;
+                utf16_str[0] = (uint16_t) wParam;
                 utf16_str[1] = 0;
                 utf16_size = 2;
                 received_char = true;

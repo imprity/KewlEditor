@@ -20,7 +20,7 @@ TextLine* text_line_create(UTFString *str, size_t line_number, bool ends_with_lf
     }
 
     line->wrapped_line_count = 1;
-    line->wrapped_line_sizes[0] = line->str->count;
+    line->wrapped_line_sizes[0] = (int) line->str->count;
 
     line->size_x = 0;
     line->size_y = 0;

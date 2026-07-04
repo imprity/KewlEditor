@@ -81,7 +81,7 @@ typedef struct TextBox{
 
 TextBox* text_box_create(
     const char* text,
-    size_t w, size_t h,
+    int w, int h,
     TTF_Font* font,
     SDL_Color bg_color, SDL_Color text_color, SDL_Color selection_bg, SDL_Color selection_fg, SDL_Color cursor_color,
     PreeditPosSetter pos_setter

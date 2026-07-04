@@ -63,6 +63,8 @@ int main(int argc, char* argv[])
                                    bg_color, text_color, selection_bg, selection_fg, cursor_color,
                                    NULL);
 
+    int ret_val = 0;
+
     if (!box)
     {
         printf("ERROR: Failed to create text box\n");
@@ -75,8 +77,6 @@ int main(int argc, char* argv[])
     }
 
     text_box_render(box);
-
-    int ret_val = 0;
 
 #if _WIN32
     ret_val = windows_main(box, argc, argv);

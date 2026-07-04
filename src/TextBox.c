@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <assert.h>
 
+#include "Util.h"
+
 #pragma execution_character_set("utf-8")
 
 #define TEST_TEXT_ENGLISH (\
@@ -25,7 +27,9 @@ u8"참고로 다른 과일인 배와 복숭아도 같은 지역이 원산지이�
 
 #define MISSING_GLYPH "?"
 
+#ifndef min
 #define min(a, b) ((a) > (b) ?  b : a)
+#endif
 
 bool sv_fits(UTFStringView sv, TTF_Font* font, int w, size_t* text_count, int* text_width) {
 	if (sv.count == 0) {
@@ -38,7 +42,7 @@ bool sv_fits(UTFStringView sv, TTF_Font* font, int w, size_t* text_count, int* t
 		return true;
 	}
 
-	int measured_count = 0;
+	size_t measured_count = 0;
 	int measured_width = 0;
 
     bool fits = true;
@@ -190,7 +194,7 @@ void get_cursor_screen_pos(TextBox* box, int* cursor_x, int* cursor_y)
 
 	int font_height = TTF_FontHeight(box->font);
 
-	offset_y += font_height * cursor_char_y;
+	offset_y += (int) (font_height * cursor_char_y);
 
 	UTFStringView sv = utf_sv_sub_str((cursor_line->str), 0, box->cursor.char_offset);
 
@@ -214,6 +218,8 @@ void get_cursor_screen_pos(TextBox* box, int* cursor_x, int* cursor_y)
 }
 
 int calculate_new_box_offset_y(TextBox* box, TextCursor cursor) {
+    UNUSED(cursor);
+
 	int font_height = TTF_FontHeight(box->font);
 
 	int offset_y = box->offset_y;
@@ -484,7 +490,7 @@ void update_text_line(TextBox* box, TextLine* line)
 			break;
 		}
 
-		line->wrapped_line_sizes[size_offset++] = measured_count;
+		line->wrapped_line_sizes[size_offset++] = (int) measured_count;
 		line->wrapped_line_count++;
 		line->size_y += font_height;
 		sv = utf_sv_trim_left(sv, measured_count);
@@ -499,7 +505,7 @@ void update_text_line(TextBox* box, TextLine* line)
 
 TextBox* text_box_create(
 	const char* text,
-	size_t w, size_t h,
+	int w, int h,
 	TTF_Font* font,
 	SDL_Color bg_color, SDL_Color text_color, SDL_Color selection_bg, SDL_Color selection_fg, SDL_Color cursor_color,
 	PreeditPosSetter pos_setter
@@ -1182,7 +1188,7 @@ TextCursor text_box_move_cursor_right_word(TextBox* box, TextCursor cursor)
             return cursor;
         }
 
-        TextLine* cursor_line = get_line_from_line_number(box, cursor.line_number);
+        cursor_line = get_line_from_line_number(box, cursor.line_number);
 
         //if we reached the end of the string return
         if(cursor.char_offset == cursor_line->str->count){
